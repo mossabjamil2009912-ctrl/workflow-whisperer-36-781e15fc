@@ -333,21 +333,25 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       setBusy(false); await doShare(r.id); setSharePhone(""); void refetchCu?.();
     } catch (e) { setMsg((e as Error).message); setBusy(false); }
   };
-  const openWhatsApp = () => {
-    let p = (sharePhone || cust.phone).replace(/\D/g, "").replace(/^00/, "");
-    if (/^0?7\d{8}$/.test(p)) p = "967" + p.replace(/^0/, "");
-    if (p && !/^\d{9,15}$/.test(p)) return setMsg("رقم غير صحيح");
-    const f = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
-    const txt = [
-      `*عرض سعر — ACTES للطاقة المتجددة*`,
-      cust.name ? `العميل: ${cust.name}` : "",
-      "",
-      ...chosen.map((l, i) => `${i + 1}. ${l.name}\n   الكمية: ${l.qty} ${l.unit ?? ""} × ${f(l.price)}$ = ${f(l.price * l.qty)}$`),
-      "",
-      `*الإجمالي: ${f(total)}$*`,
-      notes ? `\n${notes}` : "",
-    ].filter((x, i, a) => x !== "" || a[i - 1] !== "").join("\n");
-    window.open(`https://wa.me/${p}?text=${encodeURIComponent(txt)}`, "_blank");
+  const openWhatsApp = async () => {
+    if (!chosen.length) return setMsg("اختر صنفا واحدا على الأقل");
+    setBusy(true); setMsg(null);
+    try {
+      const num = no ?? "ACTES-Q-" + Date.now().toString().slice(-6);
+      const b64 = await quotePdfBase64(num, cust, chosen, notes);
+      const bin = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
+      const file = new File([bin], `عرض سعر ${num}.pdf`, { type: "application/pdf" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `عرض سعر ${num}` });
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(file); a.download = file.name; a.click();
+        let p = (sharePhone || cust.phone).replace(/\D/g, "").replace(/^00/, "");
+        if (/^0?7\d{8}$/.test(p)) p = "967" + p.replace(/^0/, "");
+        window.open(`https://wa.me/${p}`, "_blank");
+        setMsg("تم تنزيل الملف — أرفقه في محادثة واتساب");
+      }
+    } catch (e) { if ((e as Error).name !== "AbortError") setMsg((e as Error).message); } finally { setBusy(false); }
   };
   const doSave = async () => {
     if (!chosen.length) return setMsg("اختر صنفا واحدا على الأقل");
@@ -489,7 +493,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
                 <input dir="ltr" value={sharePhone} onChange={(e) => setSharePhone(e.target.value.replace(/[^\d+]/g, ""))} inputMode="tel" placeholder="رقم واتساب مثل 77XXXXXXX" className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm" />
                 <button type="submit" disabled={busy} className="rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground disabled:opacity-50">إرسال</button>
               </form>
-              <button type="button" onClick={openWhatsApp} className="flex items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-sm font-bold text-primary-foreground">فتح في تطبيق واتساب (بدون قيود)</button>
+              <button type="button" disabled={busy} onClick={() => void openWhatsApp()} className="flex items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-sm font-bold text-primary-foreground disabled:opacity-50">إرسال ملف PDF عبر واتساب (بدون قيود)</button>
               <p className="text-center text-[11px] text-muted-foreground">أو اختر من المحادثات</p>
               <input value={shareQ} onChange={(e) => setShareQ(e.target.value)} placeholder="بحث بالاسم أو الرقم" className="rounded-lg border bg-background px-3 py-2 text-sm" />
               <div className="min-h-0 flex-1 overflow-y-auto">
