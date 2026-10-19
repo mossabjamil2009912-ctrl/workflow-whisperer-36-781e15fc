@@ -57,20 +57,27 @@ const PRESETS: Preset[] = [
 
 // Commercial: Hithium HV batteries (16 kWh each) + HV control, or ready-made storage cabinets.
 type Store = { n?: number; cab?: string; kwh: number };
-const com = (kw: number, inv: string, ac: string, s: Store, pv: number): [string, number][] => {
+const com = (kw: number, inv: string, ac: string, s: Store, pv: number, invQty = 1): [string, number][] => {
   const dc = pv <= 60 ? "DCBOX_1500_4" : pv <= 120 ? "DCBOX_1500_6" : pv <= 200 ? "DCBOX_1500_8" : "DCBOX_1500_10";
-  const dcQty = Math.max(1, Math.ceil(pv / 250));
-  const store: [string, number][] = s.cab ? [[s.cab, 1]] : [["BAT_HITHIUM_16K_HV", s.n!], ["ctrl_hithium_hv16", Math.max(1, Math.ceil(s.n! / 12))], ["bat_protect_dc1500_250a", 1]];
-  return [[inv, 1], ...store, ["PV_SUNTECH_720", pv], [dc, dcQty], [ac, 1], ["cable_cu_1500v_10mm", Math.round(pv * 4)], ["mc4_connector", Math.ceil(pv / 18) * 2]];
+  const dcQty = Math.max(invQty, Math.ceil(pv / 250));
+  const store: [string, number][] = s.cab ? [[s.cab, 1]] : [["BAT_HITHIUM_16K_HV", s.n!], ["ctrl_hithium_hv16", Math.max(1, Math.ceil(s.n! / 15))], ["bat_protect_dc1500_250a", 1]];
+  return [[inv, invQty], ...store, ["PV_SUNTECH_720", pv], [dc, dcQty], [ac, invQty], ["cable_cu_1500v_10mm", Math.round(pv * 4)], ["mc4_connector", Math.ceil(pv / 18) * 2]];
 };
-const comGroup = (kw: number, inv: string, ac: string, rows: [Store, number][]): Preset[] =>
-  rows.map(([s, pv]) => ({ type: "com", group: `منظومات تجارية ${kw} كيلو`, title: `${kw} كيلو + ${s.cab ? "كبينة " : ""}${s.kwh} كيلو تخزين · ${pv} لوح`, items: com(kw, inv, ac, s, pv) }));
 const HV = (n: number): Store => ({ n, kwh: n * 16 });
+// Bot's commercial sizing (from its real replies): panels ≈ daily kWh / 3.5, inverters = ceil(PV kW / (2×rating)),
+// Hithium HV 16 kWh batteries ≈ daily × 0.35 / 16 (0.26 for 125 kW). e.g. 741 kWh/day → 125 kW: 221 panels + 12 batteries.
+const botSize = (kw: number, inv: string, ac: string, daily: number[], batK: number): Preset[] =>
+  daily.map((d) => {
+    const pv = Math.round(d / 3.5);
+    const invQty = Math.max(1, Math.ceil((pv * 0.72) / (kw * 2)));
+    const n = Math.max(2, Math.round((d * batK) / 16));
+    return { type: "com", group: `منظومات تجارية ${kw} كيلو`, title: `${invQty > 1 ? invQty + "× " : ""}${kw} كيلو · استهلاك ${d} ك.و/يوم · ${n * 16} كيلو تخزين · ${pv} لوح`, items: com(kw, inv, ac, HV(n), pv, invQty) };
+  });
 const COMMERCIAL: Preset[] = [
   ...[2, 3, 4].map((n) => ({ type: "com" as const, group: "منظومات تجارية 12 كيلو (جهد عالي)", title: `12 كيلو 3 فاز + ${n * 16} كيلو هاي فولتج · ${n * 8} لوح`, items: com(12, "INV_DEYE_12K_3P", "ac_04", HV(n), n * 8) })),
-  ...comGroup(50, "INV_SOLIS_50K_3P_HV", "ac_06", [[HV(2), 50], [HV(3), 60], [HV(4), 70], [HV(5), 80], [HV(6), 90], [{ cab: "CAB_HITHIUM_112", kwh: 112 }, 100], [HV(8), 110], [HV(9), 120], [HV(10), 130], [HV(12), 140]]),
-  ...comGroup(80, "INV_SOLIS_80K_3P_HV", "ac_10", [[HV(4), 90], [HV(5), 100], [HV(6), 110], [{ cab: "CAB_HITHIUM_112", kwh: 112 }, 120], [HV(8), 130], [HV(10), 150], [HV(12), 170], [HV(14), 190], [{ cab: "CAB_PYLON_261", kwh: 261 }, 210], [{ cab: "CAB_PYLON_313", kwh: 313 }, 230]]),
-  ...comGroup(125, "INV_SOLIS_125K_3P_HV", "ac_15", [[HV(6), 140], [{ cab: "CAB_HITHIUM_112", kwh: 112 }, 160], [HV(8), 180], [HV(10), 200], [HV(12), 221], [HV(14), 240], [HV(16), 260], [{ cab: "CAB_PYLON_261", kwh: 261 }, 280], [{ cab: "CAB_PYLON_313", kwh: 313 }, 300], [HV(24), 340]]),
+  ...botSize(50, "INV_SOLIS_50K_3P_HV", "ac_06", [150, 200, 250, 300, 350, 400, 450, 500, 600, 741], 0.35),
+  ...botSize(80, "INV_SOLIS_80K_3P_HV", "ac_10", [250, 320, 400, 480, 560, 640, 741, 850, 950, 1100], 0.35),
+  ...botSize(125, "INV_SOLIS_125K_3P_HV", "ac_15", [400, 500, 600, 741, 850, 950, 1100, 1250, 1400, 1600], 0.26),
 ];
 PRESETS.push(...COMMERCIAL);
 
