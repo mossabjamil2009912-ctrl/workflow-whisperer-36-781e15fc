@@ -34,10 +34,13 @@ const specRow = (s: string) => {
 };
 
 type Preset = { type?: "res" | "com"; group: string; title: string; items: [string, number][] };
-// Residential presets mirror the bot's «المنظومات الجاهزة» menu (same panels, batteries, protection, cable).
+// Residential presets mirror the bot's «المنظومات الجاهزة» menu exactly (same panels, batteries, protection, cable).
+// Small systems (1.6/6.2) carry real cable lengths (20/30 m) and the stand-with-protection item ($60/$100 in bot quotes);
+// 8k+ systems use the DC protection box ($80/$230) and 1 m cable (price per metre) — exactly as the bot quotes them.
 const small = (bat: string, pv: number, stand: string, cable: number): [string, number][] => [["PV_SUNTECH_595", pv], ["INV_LIPOWER_1_6K", 1], [bat, 1], [stand, 1], ["cable_cu_1500v_10mm", cable]];
 const mid = (bat: string, bq: number, pv: number): [string, number][] => [["PV_SUNTECH_720", pv], ["INV_LIPOWER_6_2K", 1], [bat, bq], ["STAND_LITHIUM_6K", 1], ["cable_cu_1500v_10mm", 30]];
-const deye = (inv: string, bq: number, pv: number, dc: string, mc4: number): [string, number][] => [["PV_SUNTECH_720", pv], [dc, 1], [inv, 1], ["ac_01", 1], ["BAT_FIDUS_16K", bq], ["mc4_connector", mc4], ["cable_cu_1500v_10mm", 30]];
+// Bot quotes: DC box ($80 → DCBOX_1000_2 / $230 → DCBOX_1000_4), AC $35, Fidus 16kWh batteries, MC4 kits, 1 m cable.
+const deye = (inv: string, bq: number, pv: number, dc: string, mc4: number): [string, number][] => [["PV_SUNTECH_720", pv], [dc, 1], [inv, 1], ["ac_01", 1], ["BAT_FIDUS_16K", bq], ["mc4_connector", mc4], ["cable_cu_1500v_10mm", 1]];
 const PRESETS: Preset[] = [
   { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 1.28 · 1 لوح 595W", items: small("BAT_RV12100", 1, "STAND_100A", 20) },
   { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 2.56 · 1 لوح 595W", items: small("BAT_RV12200", 1, "STAND_200A", 20) },
@@ -51,17 +54,17 @@ const PRESETS: Preset[] = [
   { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 16 · 9 لوح 720W", items: deye("INV_DEYE_8K_1P", 1, 9, "DCBOX_1000_2", 2) },
   { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 32 · 14 لوح 720W", items: deye("INV_DEYE_8K_1P", 2, 14, "DCBOX_1000_2", 2) },
   { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 32 · 16 لوح 720W", items: deye("INV_DEYE_8K_1P", 2, 16, "DCBOX_1000_2", 2) },
-  { group: "إنفرتر 12 كيلو", title: "12 كيلو — بطارية 32 · 18 لوح 720W", items: deye("INV_DEYE_12K_1P", 2, 18, "DCBOX_1000_4", 3) },
+  { group: "إنفرتر 12 كيلو", title: "12 كيلو — بطارية 32 · 18 لوح 720W", items: deye("INV_DEYE_12K_1P", 2, 18, "DCBOX_1000_2", 2) },
   { group: "إنفرتر 12 كيلو", title: "12 كيلو — بطارية 48 · 27 لوح 720W", items: deye("INV_DEYE_12K_1P", 3, 27, "DCBOX_1000_4", 3) },
 ];
 
-// Commercial presets copied from real bot quotes (exact quantities). Cable is always 1 m = price per metre.
-type Store = { hv?: number; ctrl?: number; ebc?: number; bdc?: number; other?: [string, number][] };
-const com = (inv: string, invQty: number, ac: string, pv: number, dcQty: number, mc4: number, s: Store): [string, number][] => [
+// Commercial presets copied from real bot quotes (exact items and quantities). Cable is always 1 m = price per metre.
+type Store = { dc: [string, number][]; hv?: number; ctrl?: number; ebc?: number; bdc?: number; other?: [string, number][] };
+const com = (inv: string, invQty: number, ac: string, pv: number, mc4: number, s: Store): [string, number][] => [
   ["PV_SUNTECH_720", pv], [inv, invQty],
   ...(s.hv ? [["BAT_HITHIUM_16K_HV", s.hv] as [string, number]] : []),
   ...(s.other ?? []),
-  ["DCBOX_1500_10", dcQty], [ac, 1],
+  ...s.dc, [ac, 1],
   ...(s.ctrl ? [["ctrl_hithium_hv16", s.ctrl] as [string, number]] : []),
   ...(s.ebc ? [["ctrl_hithium_hv16_ebc", s.ebc] as [string, number]] : []),
   ...(s.bdc ? [["bat_protect_dc1500_250a", s.bdc] as [string, number]] : []),
@@ -70,14 +73,14 @@ const com = (inv: string, invQty: number, ac: string, pv: number, dcQty: number,
 const S50 = "INV_SOLIS_50K_3P_HV", S125 = "INV_SOLIS_125K_3P_HV";
 const g50 = "منظومات تجارية 50 كيلو", g125 = "منظومات تجارية 125 كيلو";
 const COMMERCIAL: Preset[] = [
-  { type: "com", group: g50, title: "50 كيلو · 75 لوح · 4 بطارية هيثيوم (64 كيلو)", items: com(S50, 1, "ac_06", 75, 1, 5, { hv: 4, ctrl: 1, bdc: 1 }) },
-  { type: "com", group: g50, title: "2× 50 كيلو · 150 لوح · 8 بطارية هيثيوم (128 كيلو)", items: com(S50, 2, "ac_06", 150, 1, 10, { hv: 8, ctrl: 1, ebc: 1, bdc: 1 }) },
-  { type: "com", group: g50, title: "2× 50 كيلو · 180 لوح · 12 بطارية هيثيوم (192 كيلو)", items: com(S50, 2, "ac_06", 180, 2, 12, { hv: 12, ctrl: 1, ebc: 1, bdc: 1 }) },
-  { type: "com", group: g50, title: "2× 50 كيلو · 180 لوح · كبينة بايلونتك 313 كيلو", items: com(S50, 2, "ac_06", 180, 2, 12, { other: [["CAB_PYLON_313", 1]] }) },
-  { type: "com", group: g50, title: "2× 50 كيلو · 180 لوح · 13 بطارية بايلونتك M5", items: com(S50, 2, "ac_06", 180, 2, 12, { other: [["BAT_PYLON_M5_15_68K", 13], ["CTRL_M5", 1]] }) },
-  { type: "com", group: g125, title: "125 كيلو · 221 لوح · 12 بطارية هيثيوم (192 كيلو)", items: com(S125, 1, "ac_15", 221, 2, 13, { hv: 12, ctrl: 1, ebc: 1, bdc: 1 }) },
-  { type: "com", group: g125, title: "2× 125 كيلو · 442 لوح · 24 بطارية هيثيوم (384 كيلو)", items: com(S125, 2, "ac_15", 442, 3, 26, { hv: 24, ctrl: 2, ebc: 2, bdc: 2 }) },
-  { type: "com", group: g125, title: "2× 125 كيلو · 646 لوح · 36 بطارية هيثيوم (576 كيلو)", items: com(S125, 2, "ac_15", 646, 4, 38, { hv: 36, ctrl: 3, ebc: 3, bdc: 3 }) },
+  { type: "com", group: g50, title: "50 كيلو · 75 لوح · 4 بطارية هيثيوم (64 كيلو)", items: com(S50, 1, "ac_06", 75, 5, { dc: [["DCBOX_1500_6", 1]], hv: 4, ctrl: 1, bdc: 1 }) },
+  { type: "com", group: g50, title: "2× 50 كيلو · 150 لوح · 8 بطارية هيثيوم (128 كيلو)", items: com(S50, 2, "ac_06", 150, 10, { dc: [["DCBOX_1500_10", 1]], hv: 8, ctrl: 1, ebc: 1, bdc: 1 }) },
+  { type: "com", group: g50, title: "2× 50 كيلو · 180 لوح · 12 بطارية هيثيوم (192 كيلو)", items: com(S50, 2, "ac_06", 180, 12, { dc: [["DCBOX_1500_6", 2]], hv: 12, ctrl: 1, ebc: 1, bdc: 1 }) },
+  { type: "com", group: g50, title: "2× 50 كيلو · 180 لوح · كبينة بايلونتك 313 كيلو", items: com(S50, 2, "ac_06", 180, 12, { dc: [["DCBOX_1500_6", 2]], other: [["CAB_PYLON_313", 1]] }) },
+  { type: "com", group: g50, title: "2× 50 كيلو · 180 لوح · 13 بطارية بايلونتك M5", items: com(S50, 2, "ac_06", 180, 12, { dc: [["DCBOX_1500_6", 2]], other: [["BAT_PYLON_M5_15_68K", 13], ["KIT_M5", 1], ["RACK_M5_16", 1], ["CTRL_M5", 1]] }) },
+  { type: "com", group: g125, title: "125 كيلو · 221 لوح · 12 بطارية هيثيوم (192 كيلو)", items: com(S125, 1, "ac_15", 221, 13, { dc: [["DCBOX_1500_8", 2]], hv: 12, ctrl: 1, ebc: 1, bdc: 1 }) },
+  { type: "com", group: g125, title: "2× 125 كيلو · 442 لوح · 24 بطارية هيثيوم (384 كيلو)", items: com(S125, 2, "ac_15", 442, 26, { dc: [["DCBOX_1500_10", 2], ["DCBOX_1500_8", 1]], hv: 24, ctrl: 2, ebc: 2, bdc: 2 }) },
+  { type: "com", group: g125, title: "2× 125 كيلو · 646 لوح · 36 بطارية هيثيوم (576 كيلو)", items: com(S125, 2, "ac_15", 646, 38, { dc: [["DCBOX_1500_10", 4]], hv: 36, ctrl: 3, ebc: 3, bdc: 3 }) },
 ];
 PRESETS.push(...COMMERCIAL);
 // Daily consumption (kWh/day) → matching ready system.
