@@ -489,7 +489,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
                 <input dir="ltr" value={sharePhone} onChange={(e) => setSharePhone(e.target.value.replace(/[^\d+]/g, ""))} inputMode="tel" placeholder="رقم واتساب مثل 77XXXXXXX" className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm" />
                 <button type="submit" disabled={busy} className="rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground disabled:opacity-50">إرسال</button>
               </form>
-              <button type="button" onClick={openWhatsApp} className="flex items-center justify-center gap-1.5 rounded-lg bg-success py-2 text-sm font-bold text-success-foreground">فتح في تطبيق واتساب (بدون قيود)</button>
+              <button type="button" onClick={openWhatsApp} className="flex items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-sm font-bold text-primary-foreground">فتح في تطبيق واتساب (بدون قيود)</button>
               <p className="text-center text-[11px] text-muted-foreground">أو اختر من المحادثات</p>
               <input value={shareQ} onChange={(e) => setShareQ(e.target.value)} placeholder="بحث بالاسم أو الرقم" className="rounded-lg border bg-background px-3 py-2 text-sm" />
               <div className="min-h-0 flex-1 overflow-y-auto">
