@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Search, FilePlus2, Save, Minus, Plus, Trash2, Check, Zap, Battery, Sun, Box, ShieldCheck, Server, Home, Cpu, Cable, Wrench, Printer, History, Share2, X } from "lucide-react";
+import { Search, FilePlus2, Save, Minus, Plus, Trash2, Check, Zap, Battery, Sun, Box, ShieldCheck, Server, Home, Cpu, Cable, Wrench, Printer, History, Share2, X, Download } from "lucide-react";
 import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment } from "@/lib/crm.functions";
 import logoClean from "@/assets/actes-logo-clean.png";
 
@@ -163,6 +163,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
 
   const [no, setNo] = useState<string | null>(null);
   const [generated, setGenerated] = useState(false);
+  const [preview, setPreview] = useState<{ url: string; name: string; html: string } | null>(null);
   const generate = async () => {
     if (!chosen.length) return setMsg("اختر صنفا واحدا على الأقل");
     setBusy(true); setMsg("جارٍ إنشاء ملف PDF...");
@@ -171,14 +172,20 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       const b64 = await quotePdfBase64(num, cust, chosen, notes);
       const bin = atob(b64); const arr = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob([arr], { type: "application/pdf" }));
-      a.download = `عرض سعر ${num} - ${cust.name || "عميل"}.pdf`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      setGenerated(true); setMsg("تم إنشاء وتحميل ملف PDF");
+      const url = URL.createObjectURL(new Blob([arr], { type: "application/pdf" }));
+      const { css, html } = quoteBody(num, cust, chosen, notes);
+      const doc = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=820"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap"><style>body{margin:0;background:#fff;padding:8mm 0}${css}</style></head><body>${html}</body></html>`;
+      if (preview) URL.revokeObjectURL(preview.url);
+      setPreview({ url, name: `عرض سعر ${num} - ${cust.name || "عميل"}.pdf`, html: doc });
+      setGenerated(true); setMsg(null);
     } catch (e) { setMsg("تعذر إنشاء PDF: " + (e as Error).message); } finally { setBusy(false); }
   };
+  const download = () => {
+    if (!preview) return;
+    const a = document.createElement("a"); a.href = preview.url; a.download = preview.name;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  const printIt = () => { const w = window.open("", "_blank"); if (!w) return; w.document.write(preview!.html.replace("</body>", "<script>document.fonts.ready.then(()=>setTimeout(()=>print(),300))</script></body>")); w.document.close(); };
   void quoteHtml;
   const doShare = async (toId: string) => {
     setBusy(true); setMsg(null);
@@ -285,7 +292,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           {chosen.length === 0 && <li className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">اضغط على أي صنف من الجداول لإضافته</li>}
           {chosen.map((l) => (
             <li key={l.key} className="flex items-center gap-2 rounded-md bg-muted/50 px-2 py-1 text-xs animate-in fade-in slide-in-from-left-2">
-              <div className="min-w-0 flex-1"><div className="truncate font-semibold">{l.name}</div><div className="text-[10px] text-muted-foreground">{l.qty} × {usd(l.price)}</div></div>
+              <div className="min-w-0 flex-1"><div className="font-semibold">{l.name}</div>{l.specs.length > 0 && <ul className="my-0.5 space-y-0.5 border-r-2 border-primary/40 pr-1.5 text-[10px] leading-snug text-muted-foreground">{l.specs.map((s, i) => { const k = s.indexOf(":"); return <li key={i}>{k > 0 && k < 60 ? <><b className="text-foreground">{s.slice(0, k + 1)}</b>{s.slice(k + 1)}</> : s}</li>; })}</ul>}<div className="text-[10px] text-muted-foreground">{l.qty} × {usd(l.price)} {l.unit ? `/ ${l.unit}` : ""}</div></div>
               <b className="text-primary">{usd(l.qty * l.price)}</b>
               <button onClick={() => remove(l.key)} className="rounded p-0.5 text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /></button>
             </li>))}
@@ -296,7 +303,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
         </div>
         {msg && <p className="text-center text-xs font-semibold text-primary">{msg}</p>}
         <div className="grid grid-cols-2 gap-1.5">
-          <button onClick={generate} className="flex items-center justify-center gap-1 rounded-md bg-primary py-1.5 text-xs font-bold text-primary-foreground shadow transition hover:opacity-90"><Printer className="h-3.5 w-3.5" />إنشاء عرض السعر</button>
+          <button onClick={generate} disabled={busy} className="flex items-center justify-center gap-1 rounded-md bg-primary py-1.5 text-xs font-bold text-primary-foreground shadow transition hover:opacity-90 disabled:opacity-50"><Printer className="h-3.5 w-3.5" />{busy && !share ? "جارٍ الإنشاء..." : "إنشاء عرض السعر"}</button>
           <button onClick={() => (chosen.length ? setShare(true) : setMsg("اختر صنفا واحدا على الأقل"))} disabled={busy} className="flex items-center justify-center gap-1 rounded-md bg-ink py-1.5 text-xs font-bold text-ink-foreground transition hover:opacity-90 disabled:opacity-50"><Share2 className="h-3.5 w-3.5" />{busy && share ? "جارٍ الإرسال..." : "مشاركة مع عميل"}</button>
         </div>
         {share && (
@@ -311,6 +318,23 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
                   </button>))}
               </div>
               {busy && <p className="text-center text-xs text-primary">جارٍ إنشاء الملف وإرساله...</p>}
+            </div>
+          </div>
+        )}
+        {preview && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-2 animate-in fade-in" onClick={() => setPreview(null)}>
+            <div className="flex h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-card shadow-2xl animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2 border-b p-2">
+                <b className="flex-1 truncate text-sm">{preview.name}</b>
+                <button onClick={download} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"><Download className="h-4 w-4" />تحميل</button>
+                <button onClick={() => setPreview(null)} className="rounded-md p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+              </div>
+              <iframe title="معاينة عرض السعر" srcDoc={preview.html} className="min-h-0 w-full flex-1 bg-background" />
+              <div className="grid grid-cols-3 gap-2 border-t p-2">
+                <button onClick={download} className="flex items-center justify-center gap-1 rounded-md bg-primary py-2 text-sm font-bold text-primary-foreground"><Download className="h-4 w-4" />تحميل PDF</button>
+                <button onClick={printIt} className="flex items-center justify-center gap-1 rounded-md bg-muted py-2 text-sm font-bold"><Printer className="h-4 w-4" />طباعة</button>
+                <button onClick={() => { setPreview(null); setShare(true); }} className="flex items-center justify-center gap-1 rounded-md bg-ink py-2 text-sm font-bold text-ink-foreground"><Share2 className="h-4 w-4" />إرسال</button>
+              </div>
             </div>
           </div>
         )}
