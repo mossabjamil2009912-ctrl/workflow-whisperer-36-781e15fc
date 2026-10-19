@@ -109,14 +109,14 @@ let assetCache: Promise<{ fontCss: string; imgs: Record<string, string> }> | nul
 function quoteAssets() {
   if (!assetCache) assetCache = (async () => {
     const o = location.origin;
-    const [ar, la, hdr, qr] = await Promise.all([`${o}/fonts/cairo-ar.woff2`, `${o}/fonts/cairo-la.woff2`, `${o}/quote-header.jpg`, `${o}/quote-qr.jpg`].map(toDataUrl));
+    const [ar, la, hdr, qr] = (await Promise.all([`${o}/fonts/cairo-ar.woff2`, `${o}/fonts/cairo-la.woff2`, `${o}/quote-header.jpg`, `${o}/quote-qr.jpg`].map(toDataUrl))) as [string, string, string, string];
     const ff = (src: string, range: string) => `@font-face{font-family:Cairo;font-weight:200 1000;font-style:normal;src:url(${src}) format('woff2');unicode-range:${range}}`;
     return {
       fontCss: ff(ar, "U+0600-06FF,U+0750-077F,U+08A0-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC") + ff(la, "U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122,U+2212"),
-      imgs: { [`${o}/quote-header.jpg`]: hdr, [`${o}/quote-qr.jpg`]: qr },
+      imgs: { [`${o}/quote-header.jpg`]: hdr, [`${o}/quote-qr.jpg`]: qr } as Record<string, string>,
     };
   })().catch((e) => { assetCache = null; throw e; });
-  return assetCache;
+  return assetCache!;
 }
 
 async function quoteDoc(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
