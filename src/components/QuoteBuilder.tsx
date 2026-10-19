@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Search, FilePlus2, Save, Minus, Plus, Trash2, Check, Zap, Battery, Sun, Box, ShieldCheck, Server, Home, Cpu, Cable, Wrench, Printer, History, Share2, X, Download } from "lucide-react";
-import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment } from "@/lib/crm.functions";
+import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment, ensureCustomerByPhone } from "@/lib/crm.functions";
 import logoClean from "@/assets/actes-logo-clean.png";
 
 type Row = Awaited<ReturnType<typeof listCatalog>>[number];
@@ -230,7 +230,7 @@ async function quotePdfBase64(no: string, cust: { name: string; phone: string; c
 export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCustomerId?: string | null }) {
   const listC = useServerFn(listCatalog), listCu = useServerFn(listCustomers), save = useServerFn(saveQuote), sendA = useServerFn(sendAttachment), listQ = useServerFn(listQuotes), ensureC = useServerFn(ensureCustomerByPhone);
   const [sharePhone, setSharePhone] = useState("");
-REPLACE_232
+  const [sharePhone, setSharePhone] = useState("");
   const { data: customers = [], refetch: refetchCu } = useQuery({ queryKey: ["quote-customers"], queryFn: () => listCu({ data: { pw } }) });
   const { data: quotes = [], refetch: refetchQ } = useQuery({ queryKey: ["quotes"], queryFn: () => listQ({ data: { pw } }) });
 
