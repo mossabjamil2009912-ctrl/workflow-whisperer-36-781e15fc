@@ -161,6 +161,20 @@ export const sendAttachment = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Uploads a quote PDF and returns a long-lived link, so it can be sent to any number via wa.me.
+export const uploadQuotePdf = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ pw: z.string(), file_name: z.string().min(1).max(200), b64: z.string().max(23_000_000) }).parse(d))
+  .handler(async ({ data }) => {
+    check(data.pw);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bin = Uint8Array.from(atob(data.b64), (ch) => ch.charCodeAt(0));
+    const path = `quotes/${crypto.randomUUID()}.pdf`;
+    const up = await supabaseAdmin.storage.from("crm-attachments").upload(path, bin, { contentType: "application/pdf" });
+    if (up.error) throw new Error("تعذّر رفع الملف");
+    const sig = await supabaseAdmin.storage.from("crm-attachments").createSignedUrl(path, 60 * 60 * 24 * 365, { download: data.file_name });
+    if (sig.error || !sig.data) throw new Error("تعذّر إنشاء رابط الملف");
+    return { url: sig.data.signedUrl };
+  });
 
 const CONFIRM_TEXT = "أكتس لاستيراد أنظمة الطاقة\nشكراً لك، لقد تم تأكيد فاتورتك.\nستتواصل معك إدارة المبيعات في شركة أكتس خلال لحظات.";
 const CANCEL_TEXT = "أكتس لاستيراد أنظمة الطاقة\nلم يتم العثور على إشعار التحويل حتى الآن.\nيرجى التأكد من التحويل أو إعادة إرسال الإشعار.";
