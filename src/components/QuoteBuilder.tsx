@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Search, FilePlus2, Save, Minus, Plus, Trash2, Check, Zap, Battery, Sun, Box, ShieldCheck, Server, Home, Cpu, Cable, Wrench, Printer, History, Share2, X, Download } from "lucide-react";
-import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment } from "@/lib/crm.functions";
+import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment, ensureCustomerByPhone } from "@/lib/crm.functions";
 import logoClean from "@/assets/actes-logo-clean.png";
 
 type Row = Awaited<ReturnType<typeof listCatalog>>[number];
@@ -228,9 +228,10 @@ async function quotePdfBase64(no: string, cust: { name: string; phone: string; c
 }
 
 export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCustomerId?: string | null }) {
-  const listC = useServerFn(listCatalog), listCu = useServerFn(listCustomers), save = useServerFn(saveQuote), sendA = useServerFn(sendAttachment), listQ = useServerFn(listQuotes);
+  const listC = useServerFn(listCatalog), listCu = useServerFn(listCustomers), save = useServerFn(saveQuote), sendA = useServerFn(sendAttachment), listQ = useServerFn(listQuotes), ensureC = useServerFn(ensureCustomerByPhone);
+  const [sharePhone, setSharePhone] = useState("");
   const { data: rows = [] } = useQuery({ queryKey: ["catalog"], queryFn: () => listC({ data: { pw } }) });
-  const { data: customers = [] } = useQuery({ queryKey: ["quote-customers"], queryFn: () => listCu({ data: { pw } }) });
+  const { data: customers = [], refetch: refetchCu } = useQuery({ queryKey: ["quote-customers"], queryFn: () => listCu({ data: { pw } }) });
   const { data: quotes = [], refetch: refetchQ } = useQuery({ queryKey: ["quotes"], queryFn: () => listQ({ data: { pw } }) });
 
   const [active, setActive] = useState("inverters");
@@ -321,6 +322,16 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       await sendA({ data: { pw, id: toId, text: `عرض سعر ${num}`, file_name: `عرض سعر ${num} - ${cust.name || "..........."}.pdf`, mime: "application/pdf", b64 } });
       setShare(false); setMsg(`تم إرسال عرض السعر إلى ${to?.name || to?.phone}`);
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
+  };
+  const shareToPhone = async () => {
+    let p = sharePhone.replace(/\D/g, "").replace(/^00/, "");
+    if (/^0?7\d{8}$/.test(p)) p = "967" + p.replace(/^0/, "");
+    if (!/^\d{9,15}$/.test(p)) return setMsg("رقم غير صحيح");
+    setBusy(true);
+    try {
+      const r = await ensureC({ data: { pw, phone: p, name: cust.name || undefined } });
+      setBusy(false); await doShare(r.id); setSharePhone(""); void refetchCu?.();
+    } catch (e) { setMsg((e as Error).message); setBusy(false); }
   };
   const doSave = async () => {
     if (!chosen.length) return setMsg("اختر صنفا واحدا على الأقل");
@@ -458,6 +469,11 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4" onClick={() => !busy && setShare(false)}>
             <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-2 rounded-xl bg-card p-3 shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between"><b>إرسال عرض السعر PDF إلى</b><button onClick={() => setShare(false)}><X className="h-4 w-4" /></button></div>
+              <form onSubmit={(e) => { e.preventDefault(); void shareToPhone(); }} className="flex gap-1.5 rounded-lg border-2 border-primary/40 p-2">
+                <input dir="ltr" value={sharePhone} onChange={(e) => setSharePhone(e.target.value.replace(/[^\d+]/g, ""))} inputMode="tel" placeholder="رقم واتساب مثل 77XXXXXXX" className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm" />
+                <button type="submit" disabled={busy} className="rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground disabled:opacity-50">إرسال</button>
+              </form>
+              <p className="text-center text-[11px] text-muted-foreground">أو اختر من المحادثات</p>
               <input value={shareQ} onChange={(e) => setShareQ(e.target.value)} placeholder="بحث بالاسم أو الرقم" className="rounded-lg border bg-background px-3 py-2 text-sm" />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {customers.filter((c) => !shareQ || ((c.name ?? "") + c.phone).includes(shareQ)).map((c) => (
