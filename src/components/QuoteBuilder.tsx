@@ -26,12 +26,15 @@ const specsOf = (r: Row) => (Array.isArray(r.specs) ? (r.specs as unknown[]).map
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 const money = (n: number) => "$ " + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const specLine = (s: string) => {
+// Spec as key/value row; value isolated so Latin units/numbers never flip Arabic order.
+const specRow = (s: string) => {
   const i = s.indexOf(":");
-  return i > 0 && i < 60 ? `<b>${esc(s.slice(0, i + 1))}</b>${esc(s.slice(i + 1))}` : esc(s);
+  if (i > 0 && i < 60 && s.slice(i + 1).trim()) {
+    return `<tr><td class="k">${esc(s.slice(0, i).trim())}</td><td class="v"><bdi>${esc(s.slice(i + 1).trim())}</bdi></td></tr>`;
+  }
+  return `<tr><td class="v" colspan="2"><bdi>${esc(s.trim())}</bdi></td></tr>`;
 };
 
-// نسخة طبق الأصل من قالب عرض سعر البوت (عقدة Build Quote HTML)
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
   const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
   const o = location.origin;
@@ -39,35 +42,56 @@ function quoteBody(no: string, cust: { name: string; phone: string; city: string
   const p2 = (n: number) => String(n).padStart(2, "0");
   const date = `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`;
   const h = d.getHours() % 12 || 12;
-  const stamp = `${d.getHours() >= 12 ? "PM" : "AM"} ${p2(h)}:${p2(d.getMinutes())}:${p2(d.getSeconds())} ${date}`;
-  const rows = lines.map((l, i) => `<tr><td class="c">${i + 1}</td><td class="nm"><div class="t">${esc(l.name)}</div>${l.specs.length ? `<div class="sp">${l.specs.map((s) => `<div>${specLine(s)}</div>`).join("")}</div>` : ""}</td><td class="c">${esc(l.unit ?? "حبة")}</td><td class="c">${l.qty}</td><td class="m">${money(l.price)}</td><td class="m">${money(l.price * l.qty)}</td></tr>`).join("");
+  const stamp = `${date} ${p2(h)}:${p2(d.getMinutes())} ${d.getHours() >= 12 ? "PM" : "AM"}`;
+  const ltr = (s: string) => `<span class="ltr">${esc(s)}</span>`;
+  const rows = lines.map((l, i) => `<tr class="it"><td class="c">${i + 1}</td><td class="nm"><div class="t">${esc(l.name)}</div>${l.specs.length ? `<table class="sp">${l.specs.map(specRow).join("")}</table>` : ""}</td><td class="c">${esc(l.unit ?? "حبة")}</td><td class="c">${l.qty}</td><td class="m">${ltr(money(l.price))}</td><td class="m">${ltr(money(l.price * l.qty))}</td></tr>`).join("");
   const noteList = [
     "الأسعار غير شاملة أعمال التركيب ما لم يُذكر خلاف ذلك.",
     ...(lines.some((l) => /كابل/.test(l.name)) ? ["كمية الكابل (1 متر) لتحديد سعر المتر، ويُحدد الطول الفعلي حسب مسافة الموقع."] : []),
     ...(notes ? [notes] : []),
   ];
-  const css = `.qt{font-family:Cairo,sans-serif;color:#000;direction:rtl;width:190mm;margin:0 auto;font-size:11px;background:#fff}
+  const css = `.qt{font-family:Cairo,sans-serif;color:#1a1a1a;direction:rtl;width:190mm;margin:0 auto;font-size:11px;background:#fff;letter-spacing:0;word-spacing:0}
+  .qt *{box-sizing:border-box;letter-spacing:0}
+  .qt .ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+  .qt bdi{unicode-bidi:isolate}
   .qt .hdr{width:100%;display:block}
-  .qt .info{display:grid;grid-template-columns:1fr 1fr;gap:0 40px;margin:6px 4px 4px;font-size:12px;line-height:1.35}
-  .qt .info div{display:flex;gap:6px}.qt .info span{min-width:92px}
-  .qt table{width:100%;border-collapse:collapse}
-  .qt th{background:#ed1c24;color:#000;font-weight:800;font-size:14px;border:1.5px solid #000;padding:1px 4px}
-  .qt td{border:1.5px solid #000;vertical-align:top;padding:3px 5px}
-  .qt td.c{text-align:center;font-weight:700}.qt td.m{text-align:left;direction:ltr;font-weight:700;white-space:nowrap}
-  .qt .t{font-weight:800;font-size:13px;margin-bottom:8px}.qt .sp{font-size:10.5px;line-height:1.35}
+  .qt .info{width:100%;border-collapse:collapse;margin:8px 0 8px;font-size:11.5px}
+  .qt .info td{border:0;padding:2px 4px;vertical-align:middle}
+  .qt .info .l{color:#666;width:90px;white-space:nowrap}
+  .qt .info .val{font-weight:700}
+  .qt .info .gap{width:24px}
+  .qt .items{width:100%;border-collapse:collapse;table-layout:fixed}
+  .qt .items th{background:#ed1c24;color:#fff;font-weight:700;font-size:12px;border:1px solid #c4161d;padding:6px 4px;text-align:center}
+  .qt .items td{border:1px solid #bdbdbd;vertical-align:top;padding:7px 6px}
+  .qt .items tr.it:nth-child(even) td{background:#fafafa}
+  .qt td.c{text-align:center;font-weight:700}
+  .qt td.m{text-align:center;font-weight:700;white-space:nowrap}
+  .qt .t{font-weight:800;font-size:12.5px;line-height:1.5;margin-bottom:5px;text-align:right}
+  .qt table.sp{width:100%;border-collapse:collapse;font-size:10px;line-height:1.45}
+  .qt table.sp td{border:0;border-top:1px dotted #d6d6d6;padding:2px 3px;background:transparent!important;vertical-align:top}
+  .qt table.sp td.k{color:#555;width:46%;text-align:right}
+  .qt table.sp td.v{font-weight:700;text-align:right}
   .qt tr{page-break-inside:avoid}
-  .qt .tot td{background:#d9d9d9;font-weight:800;font-size:13px}.qt .tot td.m{color:#ed1c24;background:#fff}
-  .qt .notes{font-size:9.5px;margin-top:6px;line-height:1.6}
-  .qt .ft{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;border-top:1px solid #000;padding-top:4px;font-size:8.5px;direction:ltr;font-weight:700}
-  .qt .ft img{height:46px}`;
+  .qt .tot td{font-weight:800;font-size:13px;padding:8px 6px;border:1px solid #bdbdbd}
+  .qt .tot .lbl{background:#f1f1f1;text-align:left}
+  .qt .tot td.m{color:#ed1c24;background:#fff}
+  .qt .notes{font-size:10px;margin-top:10px;line-height:1.8}
+  .qt .notes b{color:#ed1c24}
+  .qt .ft{width:100%;border-collapse:collapse;margin-top:18px;border-top:1.5px solid #ed1c24;font-size:9px;color:#444}
+  .qt .ft td{padding:6px 4px 0;vertical-align:middle}
+  .qt .ft img{height:46px;display:block}`;
+  const info = (l: string, v: string) => `<td class="l">${l}</td><td class="val">${v}</td>`;
   const html = `<div class="qt"><img class="hdr" src="${o}/quote-header.jpg">
-  <div class="info"><div><span>الأخـــوة /</span><b>${esc(cust.name || "...........")}</b></div><div><span>عملة العرض :</span>الدولار الأمريكي</div>
-  <div><span>الموقع :</span>${esc(cust.city || "—")}</div><div><span>تاريخ عرض السعر :</span>${date}</div>
-  <div><span>رقم الموبايل :</span><span dir="ltr" style="text-align:right">${esc(cust.phone ? "+" + cust.phone.replace(/^\+/, "") : "—")}</span></div><div><span>رقم عرض السعر :</span>${esc(no)}</div></div>
-  <table><thead><tr><th style="width:22px">م</th><th>اســم الـصنـف والــمـــواصـفـــات</th><th style="width:58px">الوحدة</th><th style="width:58px">الكمية</th><th style="width:88px">السعر</th><th style="width:96px">الإجمالي</th></tr></thead>
-  <tbody>${rows}<tr class="tot"><td colspan="5" style="text-align:center">الإجمالي</td><td class="m">${money(total)}</td></tr></tbody></table>
-  <div class="notes">${noteList.map((n, i) => `${i === 0 ? "مـلاحـظــات: " : ""}${i + 1}. ${esc(n)}`).join("<br>")}</div>
-  <div class="ft"><img src="${o}/quote-qr.jpg"><span>www.actesgroup.com &nbsp;&nbsp; email: info@actesgroup.com</span><span>طبع بواسطة : ACTES CRM</span><span>تاريخ التقرير : ${stamp}</span></div></div>`;
+  <table class="info"><tbody>
+  <tr>${info("الأخوة:", esc(cust.name || "..........."))}<td class="gap"></td>${info("رقم العرض:", ltr(no))}</tr>
+  <tr>${info("الموقع:", esc(cust.city || "—"))}<td class="gap"></td>${info("التاريخ:", ltr(date))}</tr>
+  <tr>${info("الموبايل:", cust.phone ? ltr("+" + cust.phone.replace(/^\+/, "")) : "—")}<td class="gap"></td>${info("العملة:", "الدولار الأمريكي")}</tr>
+  </tbody></table>
+  <table class="items"><colgroup><col style="width:28px"><col><col style="width:52px"><col style="width:50px"><col style="width:86px"><col style="width:92px"></colgroup>
+  <thead><tr><th>م</th><th>الصنف والمواصفات</th><th>الوحدة</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
+  <tbody>${rows}<tr class="tot"><td colspan="5" class="lbl">الإجمالي الكلي</td><td class="m">${ltr(money(total))}</td></tr></tbody></table>
+  <div class="notes"><b>ملاحظات:</b><br>${noteList.map((n, i) => `${i + 1}. ${esc(n)}`).join("<br>")}</div>
+  <table class="ft"><tr><td style="width:56px"><img src="${o}/quote-qr.jpg"></td><td style="text-align:center"><span class="ltr">www.actesgroup.com · info@actesgroup.com</span></td><td style="text-align:left;white-space:nowrap">طبع بواسطة: <span class="ltr">ACTES CRM</span> · <span class="ltr">${stamp}</span></td></tr></table></div>`;
   return { css, html };
 }
 
