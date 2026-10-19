@@ -228,9 +228,10 @@ async function quotePdfBase64(no: string, cust: { name: string; phone: string; c
 }
 
 export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCustomerId?: string | null }) {
-  const listC = useServerFn(listCatalog), listCu = useServerFn(listCustomers), save = useServerFn(saveQuote), sendA = useServerFn(sendAttachment), listQ = useServerFn(listQuotes);
-  const { data: rows = [] } = useQuery({ queryKey: ["catalog"], queryFn: () => listC({ data: { pw } }) });
-  const { data: customers = [] } = useQuery({ queryKey: ["quote-customers"], queryFn: () => listCu({ data: { pw } }) });
+  const listC = useServerFn(listCatalog), listCu = useServerFn(listCustomers), save = useServerFn(saveQuote), sendA = useServerFn(sendAttachment), listQ = useServerFn(listQuotes), ensureC = useServerFn(ensureCustomerByPhone);
+  const [sharePhone, setSharePhone] = useState("");
+REPLACE_232
+  const { data: customers = [], refetch: refetchCu } = useQuery({ queryKey: ["quote-customers"], queryFn: () => listCu({ data: { pw } }) });
   const { data: quotes = [], refetch: refetchQ } = useQuery({ queryKey: ["quotes"], queryFn: () => listQ({ data: { pw } }) });
 
   const [active, setActive] = useState("inverters");
