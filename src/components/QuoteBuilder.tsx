@@ -34,21 +34,25 @@ const specRow = (s: string) => {
 };
 
 type Preset = { type?: "res" | "com"; group: string; title: string; items: [string, number][] };
-const sys = (inv: string, bat: string, bq: number, pv: number, dc: string, ac: string): [string, number][] => [[inv, 1], [bat, bq], ["PV_SUNTECH_720", pv], [dc, 1], [ac, 1], ["cable_cu_1500v_10mm", 50], ["mc4_connector", 4]];
+// Residential presets mirror the bot's «المنظومات الجاهزة» menu (same panels, batteries, protection, cable).
+const small = (bat: string, pv: number, stand: string, cable: number): [string, number][] => [["PV_SUNTECH_595", pv], ["INV_LIPOWER_1_6K", 1], [bat, 1], [stand, 1], ["cable_cu_1500v_10mm", cable]];
+const mid = (bat: string, bq: number, pv: number): [string, number][] => [["PV_SUNTECH_720", pv], ["INV_LIPOWER_6_2K", 1], [bat, bq], ["STAND_LITHIUM_6K", 1], ["cable_cu_1500v_10mm", 30]];
+const deye = (inv: string, bq: number, pv: number, dc: string, mc4: number): [string, number][] => [["PV_SUNTECH_720", pv], [dc, 1], [inv, 1], ["ac_01", 1], ["BAT_FIDUS_16K", bq], ["mc4_connector", mc4], ["cable_cu_1500v_10mm", 30]];
 const PRESETS: Preset[] = [
-  { group: "منظومات 1.6 كيلو", title: "1.6 كيلو + بطارية 1.28 كيلو", items: sys("INV_LIPOWER_1_6K", "BAT_RV12100", 1, 2, "DCBOX_1000_2", "ac_01") },
-  { group: "منظومات 1.6 كيلو", title: "1.6 كيلو + بطارية 2.56 كيلو", items: sys("INV_LIPOWER_1_6K", "BAT_RV12200", 1, 2, "DCBOX_1000_2", "ac_01") },
-  { group: "منظومات 6.2 كيلو", title: "6.2 كيلو + بطارية 5.12 كيلو", items: sys("INV_LIPOWER_6_2K", "BAT_UF5000", 1, 6, "DCBOX_1000_2", "ac_01") },
-  { group: "منظومات 6.2 كيلو", title: "6.2 كيلو + بطارية 10.24 كيلو", items: sys("INV_LIPOWER_6_2K", "BAT_UF5000", 2, 6, "DCBOX_1000_2", "ac_01") },
-  { group: "منظومات 6.2 كيلو", title: "6.2 كيلو + بطارية 16 كيلو", items: sys("INV_LIPOWER_6_2K", "BAT_FIDUS_16K", 1, 6, "DCBOX_1000_2", "ac_01") },
-  { group: "منظومات 8 كيلو", title: "8 كيلو + بطارية 16 كيلو", items: sys("INV_DEYE_8K_1P", "BAT_FIDUS_16K", 1, 10, "DCBOX_1000_2", "ac_02") },
-  { group: "منظومات 8 كيلو", title: "8 كيلو + بطارية 32 كيلو", items: sys("INV_DEYE_8K_1P", "BAT_FIDUS_16K", 2, 10, "DCBOX_1000_2", "ac_02") },
-  { group: "منظومات 12 كيلو سنجل فاز", title: "12 كيلو + بطارية 16 كيلو", items: sys("INV_DEYE_12K_1P", "BAT_FIDUS_16K", 1, 16, "DCBOX_1000_4", "ac_02") },
-  { group: "منظومات 12 كيلو سنجل فاز", title: "12 كيلو + بطارية 32 كيلو", items: sys("INV_DEYE_12K_1P", "BAT_FIDUS_16K", 2, 16, "DCBOX_1000_4", "ac_02") },
-  { group: "منظومات 12 كيلو سنجل فاز", title: "12 كيلو + بطارية 48 كيلو", items: sys("INV_DEYE_12K_1P", "BAT_FIDUS_16K", 3, 16, "DCBOX_1000_4", "ac_02") },
-  { group: "منظومات 12 كيلو ثري فاز", title: "12 كيلو 3 فاز + بطارية 16 كيلو", items: sys("INV_DEYE_12K_3P", "BAT_FIDUS_16K", 1, 16, "DCBOX_1000_4", "ac_04") },
-  { group: "منظومات 12 كيلو ثري فاز", title: "12 كيلو 3 فاز + بطارية 32 كيلو", items: sys("INV_DEYE_12K_3P", "BAT_FIDUS_16K", 2, 16, "DCBOX_1000_4", "ac_04") },
-  { group: "منظومات 12 كيلو ثري فاز", title: "12 كيلو 3 فاز + بطارية 48 كيلو", items: sys("INV_DEYE_12K_3P", "BAT_FIDUS_16K", 3, 16, "DCBOX_1000_4", "ac_04") },
+  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 1.28 · 1 لوح 595W", items: small("BAT_RV12100", 1, "STAND_100A", 20) },
+  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 2.56 · 1 لوح 595W", items: small("BAT_RV12200", 1, "STAND_200A", 20) },
+  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 2.56 · 2 لوح 595W", items: small("BAT_RV12200", 2, "STAND_200A", 20) },
+  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 4 · 2 لوح 595W", items: small("BAT_HEROEE_4K", 2, "STAND_314A", 30) },
+  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 4 · 3 لوح 595W", items: small("BAT_HEROEE_4K", 3, "STAND_314A", 30) },
+  { group: "إنفرتر 6.2 كيلو", title: "6.2 كيلو — بطارية 5.12 · 4 لوح 720W", items: mid("BAT_UF5000", 1, 4) },
+  { group: "إنفرتر 6.2 كيلو", title: "6.2 كيلو — بطارية 10.24 · 5 لوح 720W", items: mid("BAT_UF5000", 2, 5) },
+  { group: "إنفرتر 6.2 كيلو", title: "6.2 كيلو — بطارية 16 · 6 لوح 720W", items: mid("BAT_FIDUS_16K", 1, 6) },
+  { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 16 · 8 لوح 720W", items: deye("INV_DEYE_8K_1P", 1, 8, "DCBOX_1000_2", 2) },
+  { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 16 · 9 لوح 720W", items: deye("INV_DEYE_8K_1P", 1, 9, "DCBOX_1000_2", 2) },
+  { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 32 · 14 لوح 720W", items: deye("INV_DEYE_8K_1P", 2, 14, "DCBOX_1000_2", 2) },
+  { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 32 · 16 لوح 720W", items: deye("INV_DEYE_8K_1P", 2, 16, "DCBOX_1000_2", 2) },
+  { group: "إنفرتر 12 كيلو", title: "12 كيلو — بطارية 32 · 18 لوح 720W", items: deye("INV_DEYE_12K_1P", 2, 18, "DCBOX_1000_4", 3) },
+  { group: "إنفرتر 12 كيلو", title: "12 كيلو — بطارية 48 · 27 لوح 720W", items: deye("INV_DEYE_12K_1P", 3, 27, "DCBOX_1000_4", 3) },
 ];
 
 // Commercial: Hithium HV batteries (16 kWh each) + HV control, or ready-made storage cabinets.
