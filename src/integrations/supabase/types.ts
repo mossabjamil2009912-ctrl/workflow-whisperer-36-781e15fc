@@ -14,7 +14,293 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      catalog_items: {
+        Row: {
+          active: boolean
+          category: string
+          category_title: string | null
+          key: string
+          kind: string
+          label: string | null
+          name: string
+          pdf_url: string | null
+          price: number | null
+          sort: number
+          specs: Json
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string
+          category_title?: string | null
+          key: string
+          kind?: string
+          label?: string | null
+          name: string
+          pdf_url?: string | null
+          price?: number | null
+          sort?: number
+          specs?: Json
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          category_title?: string | null
+          key?: string
+          kind?: string
+          label?: string | null
+          name?: string
+          pdf_url?: string | null
+          price?: number | null
+          sort?: number
+          specs?: Json
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          city: string | null
+          created_at: string
+          id: string
+          last_at: string
+          last_message: string | null
+          name: string | null
+          notes: string | null
+          phone: string
+          stage: string
+          system: string | null
+          unread: number
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          last_at?: string
+          last_message?: string | null
+          name?: string | null
+          notes?: string | null
+          phone: string
+          stage?: string
+          system?: string | null
+          unread?: number
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          last_at?: string
+          last_message?: string | null
+          name?: string | null
+          notes?: string | null
+          phone?: string
+          stage?: string
+          system?: string | null
+          unread?: number
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          created_at: string
+          customer_id: string
+          direction: string
+          id: string
+          kind: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          direction?: string
+          id?: string
+          kind?: string
+          text?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          direction?: string
+          id?: string
+          kind?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          amount: string | null
+          city: string | null
+          created_at: string
+          customer_id: string | null
+          decided_at: string | null
+          details: string | null
+          id: string
+          invoice_no: string | null
+          method: string | null
+          name: string | null
+          phone: string
+          status: string
+        }
+        Insert: {
+          amount?: string | null
+          city?: string | null
+          created_at?: string
+          customer_id?: string | null
+          decided_at?: string | null
+          details?: string | null
+          id?: string
+          invoice_no?: string | null
+          method?: string | null
+          name?: string | null
+          phone: string
+          status?: string
+        }
+        Update: {
+          amount?: string | null
+          city?: string | null
+          created_at?: string
+          customer_id?: string | null
+          decided_at?: string | null
+          details?: string | null
+          id?: string
+          invoice_no?: string | null
+          method?: string | null
+          name?: string | null
+          phone?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          city: string | null
+          created_at: string
+          customer_id: string | null
+          customer_name: string | null
+          id: string
+          items: Json
+          notes: string | null
+          phone: string | null
+          quote_no: string
+          total: number
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_name?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          phone?: string | null
+          quote_no?: string
+          total?: number
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_name?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          phone?: string | null
+          quote_no?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          assigned_to: string | null
+          city: string | null
+          created_at: string
+          customer_id: string | null
+          description: string | null
+          device: string | null
+          id: string
+          issue_type: string | null
+          media_id: string | null
+          media_type: string | null
+          name: string | null
+          phone: string
+          resolved_at: string | null
+          status: string
+          ticket_no: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          city?: string | null
+          created_at?: string
+          customer_id?: string | null
+          description?: string | null
+          device?: string | null
+          id?: string
+          issue_type?: string | null
+          media_id?: string | null
+          media_type?: string | null
+          name?: string | null
+          phone: string
+          resolved_at?: string | null
+          status?: string
+          ticket_no?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          city?: string | null
+          created_at?: string
+          customer_id?: string | null
+          description?: string | null
+          device?: string | null
+          id?: string
+          issue_type?: string | null
+          media_id?: string | null
+          media_type?: string | null
+          name?: string | null
+          phone?: string
+          resolved_at?: string | null
+          status?: string
+          ticket_no?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
