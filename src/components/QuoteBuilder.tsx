@@ -351,7 +351,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   return (
     <div className="grid gap-3 p-3 lg:h-full lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
       <section className="flex min-h-0 flex-col gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h2 className="flex items-center gap-2 text-lg font-bold"><FilePlus2 className="h-5 w-5 text-primary" />إنشاء عرض سعر</h2>
           <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (n > 0) loadPreset(presetForDaily(n)); }} className="mr-auto flex items-center gap-1">
             <input value={daily} onChange={(e) => setDaily(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="استهلاك يومي (كيلو)" className="w-32 rounded-lg border bg-card px-2 py-1.5 text-xs" />
