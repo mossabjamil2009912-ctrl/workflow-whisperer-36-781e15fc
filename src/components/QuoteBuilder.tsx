@@ -322,6 +322,16 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       setShare(false); setMsg(`تم إرسال عرض السعر إلى ${to?.name || to?.phone}`);
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
   };
+  const shareToPhone = async () => {
+    let p = sharePhone.replace(/\D/g, "").replace(/^00/, "");
+    if (/^0?7\d{8}$/.test(p)) p = "967" + p.replace(/^0/, "");
+    if (!/^\d{9,15}$/.test(p)) return setMsg("رقم غير صحيح");
+    setBusy(true);
+    try {
+      const r = await ensureC({ data: { pw, phone: p, name: cust.name || undefined } });
+      setBusy(false); await doShare(r.id); setSharePhone(""); void refetchCu?.();
+    } catch (e) { setMsg((e as Error).message); setBusy(false); }
+  };
   const doSave = async () => {
     if (!chosen.length) return setMsg("اختر صنفا واحدا على الأقل");
     setBusy(true); setMsg(null);
@@ -458,6 +468,11 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4" onClick={() => !busy && setShare(false)}>
             <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-2 rounded-xl bg-card p-3 shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between"><b>إرسال عرض السعر PDF إلى</b><button onClick={() => setShare(false)}><X className="h-4 w-4" /></button></div>
+              <form onSubmit={(e) => { e.preventDefault(); void shareToPhone(); }} className="flex gap-1.5 rounded-lg border-2 border-primary/40 p-2">
+                <input dir="ltr" value={sharePhone} onChange={(e) => setSharePhone(e.target.value.replace(/[^\d+]/g, ""))} inputMode="tel" placeholder="رقم واتساب مثل 77XXXXXXX" className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm" />
+                <button type="submit" disabled={busy} className="rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground disabled:opacity-50">إرسال</button>
+              </form>
+              <p className="text-center text-[11px] text-muted-foreground">أو اختر من المحادثات</p>
               <input value={shareQ} onChange={(e) => setShareQ(e.target.value)} placeholder="بحث بالاسم أو الرقم" className="rounded-lg border bg-background px-3 py-2 text-sm" />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {customers.filter((c) => !shareQ || ((c.name ?? "") + c.phone).includes(shareQ)).map((c) => (

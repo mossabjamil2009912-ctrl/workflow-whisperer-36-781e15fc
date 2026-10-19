@@ -113,6 +113,18 @@ export const sendMessage = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const ensureCustomerByPhone = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ pw: z.string(), phone: z.string().regex(/^\d{9,15}$/), name: z.string().max(200).optional() }).parse(d))
+  .handler(async ({ data }) => {
+    check(data.pw);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: ex } = await supabaseAdmin.from("customers").select("id").eq("phone", data.phone).maybeSingle();
+    if (ex) return { id: ex.id as string };
+    const { data: c, error } = await supabaseAdmin.from("customers").insert({ phone: data.phone, name: data.name || null }).select("id").single();
+    if (error || !c) throw new Error("تعذّر إضافة الرقم");
+    return { id: c.id as string };
+  });
+
 export const sendAttachment = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     pw: z.string(), id: z.string().uuid(), text: z.string().max(1024).default(""),
