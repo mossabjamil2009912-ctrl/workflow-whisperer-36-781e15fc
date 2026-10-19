@@ -24,11 +24,12 @@ describe("system composition matches the bot's fixed quotes", () => {
     expect(p["mc4_connector"]).toBe(2);
     expect(p["PV_SUNTECH_720"]).toBe(18);
   });
-  it("10 kWh → 6.2 system: one 5.12 battery, 4 panels, 30 m cable, no DC box", () => {
+  it("10 kWh → 6.2 system: two 5.12 batteries, 5 panels, 30 m cable, no DC box", () => {
     const p = m(10);
-    expect(p["BAT_UF5000"]).toBe(1);
+    expect(p["BAT_UF5000"]).toBe(2);
     expect(p["STAND_LITHIUM_6K"]).toBe(1);
     expect(p["cable_cu_1500v_10mm"]).toBe(30);
+    expect(p["PV_SUNTECH_720"]).toBe(5);
     expect(p["DCBOX_1000_2"]).toBeUndefined();
   });
   it("40 kWh → commercial 50k: DC box 1500_6, battery protection box, 4 HV batteries, 75 panels", () => {
