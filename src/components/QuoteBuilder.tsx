@@ -80,6 +80,11 @@ const COMMERCIAL: Preset[] = [
   { type: "com", group: g125, title: "2× 125 كيلو · 646 لوح · 36 بطارية هيثيوم (576 كيلو)", items: com(S125, 2, "ac_15", 646, 4, 38, { hv: 36, ctrl: 3, ebc: 3, bdc: 3 }) },
 ];
 PRESETS.push(...COMMERCIAL);
+// Daily consumption (kWh/day) → matching ready system.
+export const presetForDaily = (n: number): Preset => {
+  const i = n <= 3 ? 1 : n <= 7 ? 5 : n <= 11 ? 8 : n <= 25 ? 12 : n <= 65 ? 14 : n <= 150 ? 19 : n <= 400 ? 20 : 21;
+  return PRESETS[i]!;
+};
 
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
   const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
@@ -239,6 +244,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   const [busy, setBusy] = useState(false);
   const [showHist, setShowHist] = useState(false);
   const [presetTab, setPresetTab] = useState<"res" | "com">("res");
+  const [daily, setDaily] = useState("");
   const [share, setShare] = useState(false);
   const [shareQ, setShareQ] = useState("");
 
@@ -347,7 +353,11 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       <section className="flex min-h-0 flex-col gap-3">
         <div className="flex items-center gap-2">
           <h2 className="flex items-center gap-2 text-lg font-bold"><FilePlus2 className="h-5 w-5 text-primary" />إنشاء عرض سعر</h2>
-          <button onClick={() => setShowHist((v) => !v)} className="mr-auto flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض الجاهزة ({PRESETS.length})</button>
+          <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (n > 0) loadPreset(presetForDaily(n)); }} className="mr-auto flex items-center gap-1">
+            <input value={daily} onChange={(e) => setDaily(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="استهلاك يومي (كيلو)" className="w-32 rounded-lg border bg-card px-2 py-1.5 text-xs" />
+            <button type="submit" className="rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground">عرض</button>
+          </form>
+          <button onClick={() => setShowHist((v) => !v)} className="flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض الجاهزة ({PRESETS.length})</button>
         </div>
         {showHist && (
           <div className="max-h-96 overflow-y-auto rounded-xl border bg-muted/30 p-2 animate-in fade-in slide-in-from-top-2">
