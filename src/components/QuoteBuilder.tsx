@@ -81,9 +81,14 @@ const COMMERCIAL: Preset[] = [
 ];
 PRESETS.push(...COMMERCIAL);
 // Daily consumption (kWh/day) → matching ready system.
+// 0–28 residential; up to 36 still max 2 batteries (32 kWh); commercial HV only above 36.
+const DAILY: [number, number][] = [
+  [1.5, 0], [3, 2], [4.5, 3], [6, 4], [10, 5], [14, 6], [17, 8], [20, 9], [24, 10], [28, 11], [36, 12],
+  [120, 14], [180, 15], [250, 16], [400, 19], [700, 20],
+];
 export const presetForDaily = (n: number): Preset => {
-  const i = n <= 3 ? 1 : n <= 7 ? 5 : n <= 11 ? 8 : n <= 25 ? 12 : n <= 65 ? 14 : n <= 150 ? 19 : n <= 400 ? 20 : 21;
-  return PRESETS[i]!;
+  const hit = DAILY.find(([max]) => n <= max);
+  return PRESETS[hit ? hit[1] : 21]!;
 };
 
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
