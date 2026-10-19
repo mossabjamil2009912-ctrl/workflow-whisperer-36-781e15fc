@@ -247,12 +247,21 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       setGenerated(true); setMsg(null);
     } catch (e) { setMsg("تعذر إنشاء PDF: " + (e as Error).message); } finally { setBusy(false); }
   };
-  const download = () => {
+  // Browser print engine → "Save as PDF" keeps real vector text & exact preview layout.
+  const printIt = async () => {
     if (!preview) return;
-    const a = document.createElement("a"); a.href = preview.url; a.download = preview.name;
-    document.body.appendChild(a); a.click(); a.remove();
+    const f = document.createElement("iframe");
+    f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+    document.body.appendChild(f);
+    const d = f.contentDocument!;
+    d.open();
+    d.write(preview.html.replace("<head>", `<head><title>${esc(preview.name.replace(/\.pdf$/, ""))}</title>`).replace("</style>", "@page{size:A4;margin:8mm 6mm}@media print{body{padding:0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>"));
+    d.close();
+    await d.fonts.ready;
+    await Promise.all([...d.images].map((im) => (im.complete ? null : new Promise((r) => { im.onload = im.onerror = r; }))));
+    setTimeout(() => { f.contentWindow!.focus(); f.contentWindow!.print(); setTimeout(() => f.remove(), 60000); }, 200);
   };
-  const printIt = () => { const w = window.open("", "_blank"); if (!w) return; w.document.write(preview!.html.replace("</body>", "<script>document.fonts.ready.then(()=>setTimeout(()=>print(),300))</script></body>")); w.document.close(); };
+  const download = printIt;
   void quoteHtml;
   const doShare = async (toId: string) => {
     setBusy(true); setMsg(null);
