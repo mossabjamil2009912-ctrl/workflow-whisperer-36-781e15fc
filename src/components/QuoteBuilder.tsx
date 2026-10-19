@@ -26,13 +26,11 @@ const specsOf = (r: Row) => (Array.isArray(r.specs) ? (r.specs as unknown[]).map
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 const money = (n: number) => "$ " + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-// Spec as key/value row; value isolated so Latin units/numbers never flip Arabic order.
+// Spec printed verbatim as one continuous line, exactly as stored in the catalog.
 const specRow = (s: string) => {
   const i = s.indexOf(":");
-  if (i > 0 && i < 60 && s.slice(i + 1).trim()) {
-    return `<tr><td class="k">${esc(s.slice(0, i).trim())}</td><td class="v"><bdi>${esc(s.slice(i + 1).trim())}</bdi></td></tr>`;
-  }
-  return `<tr><td class="v" colspan="2"><bdi>${esc(s.trim())}</bdi></td></tr>`;
+  const body = i > 0 && i < 60 ? `<b>${esc(s.slice(0, i + 1))}</b>${esc(s.slice(i + 1))}` : esc(s);
+  return `<div class="sl">${body}</div>`;
 };
 
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
@@ -44,7 +42,7 @@ function quoteBody(no: string, cust: { name: string; phone: string; city: string
   const h = d.getHours() % 12 || 12;
   const stamp = `${date} ${p2(h)}:${p2(d.getMinutes())} ${d.getHours() >= 12 ? "PM" : "AM"}`;
   const ltr = (s: string) => `<span class="ltr">${esc(s)}</span>`;
-  const rows = lines.map((l, i) => `<tr class="it"><td class="c">${i + 1}</td><td class="nm"><div class="t">${esc(l.name)}</div>${l.specs.length ? `<table class="sp">${l.specs.map(specRow).join("")}</table>` : ""}</td><td class="c">${esc(l.unit ?? "حبة")}</td><td class="c">${l.qty}</td><td class="m">${ltr(money(l.price))}</td><td class="m">${ltr(money(l.price * l.qty))}</td></tr>`).join("");
+  const rows = lines.map((l, i) => `<tr class="it"><td class="c">${i + 1}</td><td class="nm"><div class="t">${esc(l.name)}</div>${l.specs.length ? `<div class="sp">${l.specs.map(specRow).join("")}</div>` : ""}</td><td class="c">${esc(l.unit ?? "حبة")}</td><td class="c">${l.qty}</td><td class="m">${ltr(money(l.price))}</td><td class="m">${ltr(money(l.price * l.qty))}</td></tr>`).join("");
   const noteList = [
     "الأسعار غير شاملة أعمال التركيب ما لم يُذكر خلاف ذلك.",
     ...(lines.some((l) => /كابل/.test(l.name)) ? ["كمية الكابل (1 متر) لتحديد سعر المتر، ويُحدد الطول الفعلي حسب مسافة الموقع."] : []),
@@ -67,10 +65,10 @@ function quoteBody(no: string, cust: { name: string; phone: string; city: string
   .qt td.c{text-align:center;font-weight:700}
   .qt td.m{text-align:center;font-weight:700;white-space:nowrap}
   .qt .t{font-weight:800;font-size:12.5px;line-height:1.5;margin-bottom:5px;text-align:right}
-  .qt table.sp{width:100%;border-collapse:collapse;font-size:10px;line-height:1.45}
-  .qt table.sp td{border:0;border-top:1px dotted #d6d6d6;padding:2px 3px;background:transparent!important;vertical-align:top}
-  .qt table.sp td.k{color:#555;width:46%;text-align:right}
-  .qt table.sp td.v{font-weight:700;text-align:right}
+  .qt .sp{font-size:10.5px;line-height:1.6;text-align:right}
+  .qt .sp .sl{padding:1px 0;border-top:1px dotted #e0e0e0;unicode-bidi:plaintext}
+  .qt .sp .sl:first-child{border-top:0}
+  .qt .sp b{font-weight:700;color:#222}
   .qt tr{page-break-inside:avoid}
   .qt .tot td{font-weight:800;font-size:13px;padding:8px 6px;border:1px solid #bdbdbd}
   .qt .tot .lbl{background:#f1f1f1;text-align:left}
