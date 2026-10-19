@@ -240,8 +240,8 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       const bin = atob(b64); const arr = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
       const url = URL.createObjectURL(new Blob([arr], { type: "application/pdf" }));
-      const { css, html } = quoteBody(num, cust, chosen, notes);
-      const doc = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=820"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap"><style>body{margin:0;background:#fff;padding:8mm 0}${css}</style></head><body>${html}</body></html>`;
+      const { css, html } = await quoteDoc(num, cust, chosen, notes);
+      const doc = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=760"><style>body{margin:0;background:#fff;padding:6mm 0}${css}</style></head><body>${html}</body></html>`;
       if (preview) URL.revokeObjectURL(preview.url);
       setPreview({ url, name: `عرض سعر ${num} - ${cust.name || "عميل"}.pdf`, html: doc });
       setGenerated(true); setMsg(null);
