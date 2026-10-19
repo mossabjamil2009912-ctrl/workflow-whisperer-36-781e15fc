@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      bot_button_locks: {
+        Row: {
+          choice: string | null
+          context_id: string
+          created_at: string
+          phone: string | null
+        }
+        Insert: {
+          choice?: string | null
+          context_id: string
+          created_at?: string
+          phone?: string | null
+        }
+        Update: {
+          choice?: string | null
+          context_id?: string
+          created_at?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
       catalog_items: {
         Row: {
           active: boolean
@@ -64,6 +85,7 @@ export type Database = {
       }
       customers: {
         Row: {
+          bot_paused: boolean
           city: string | null
           created_at: string
           id: string
@@ -77,6 +99,7 @@ export type Database = {
           unread: number
         }
         Insert: {
+          bot_paused?: boolean
           city?: string | null
           created_at?: string
           id?: string
@@ -90,6 +113,7 @@ export type Database = {
           unread?: number
         }
         Update: {
+          bot_paused?: boolean
           city?: string | null
           created_at?: string
           id?: string
@@ -109,24 +133,36 @@ export type Database = {
           created_at: string
           customer_id: string
           direction: string
+          file_name: string | null
           id: string
           kind: string
+          media_id: string | null
+          media_url: string | null
+          mime: string | null
           text: string
         }
         Insert: {
           created_at?: string
           customer_id: string
           direction?: string
+          file_name?: string | null
           id?: string
           kind?: string
+          media_id?: string | null
+          media_url?: string | null
+          mime?: string | null
           text?: string
         }
         Update: {
           created_at?: string
           customer_id?: string
           direction?: string
+          file_name?: string | null
           id?: string
           kind?: string
+          media_id?: string | null
+          media_url?: string | null
+          mime?: string | null
           text?: string
         }
         Relationships: [
