@@ -33,7 +33,7 @@ const specRow = (s: string) => {
   return `<div class="sl">${body}</div>`;
 };
 
-type Preset = { group: string; title: string; items: [string, number][] };
+type Preset = { type?: "res" | "com"; group: string; title: string; items: [string, number][] };
 const sys = (inv: string, bat: string, bq: number, pv: number, dc: string, ac: string): [string, number][] => [[inv, 1], [bat, bq], ["PV_SUNTECH_720", pv], [dc, 1], [ac, 1], ["cable_cu_1500v_10mm", 50], ["mc4_connector", 4]];
 const PRESETS: Preset[] = [
   { group: "منظومات 1.6 كيلو", title: "1.6 كيلو + بطارية 1.28 كيلو", items: sys("INV_LIPOWER_1_6K", "BAT_RV12100", 1, 2, "DCBOX_1000_2", "ac_01") },
@@ -50,6 +50,25 @@ const PRESETS: Preset[] = [
   { group: "منظومات 12 كيلو ثري فاز", title: "12 كيلو 3 فاز + بطارية 32 كيلو", items: sys("INV_DEYE_12K_3P", "BAT_FIDUS_16K", 2, 16, "DCBOX_1000_4", "ac_04") },
   { group: "منظومات 12 كيلو ثري فاز", title: "12 كيلو 3 فاز + بطارية 48 كيلو", items: sys("INV_DEYE_12K_3P", "BAT_FIDUS_16K", 3, 16, "DCBOX_1000_4", "ac_04") },
 ];
+
+// Commercial: Hithium HV batteries (16 kWh each) + HV control, or ready-made storage cabinets.
+type Store = { n?: number; cab?: string; kwh: number };
+const com = (kw: number, inv: string, ac: string, s: Store, pv: number): [string, number][] => {
+  const dc = pv <= 60 ? "DCBOX_1500_4" : pv <= 120 ? "DCBOX_1500_6" : pv <= 200 ? "DCBOX_1500_8" : "DCBOX_1500_10";
+  const dcQty = Math.max(1, Math.ceil(pv / 250));
+  const store: [string, number][] = s.cab ? [[s.cab, 1]] : [["BAT_HITHIUM_16K_HV", s.n!], ["ctrl_hithium_hv16", Math.max(1, Math.ceil(s.n! / 12))], ["bat_protect_dc1500_250a", 1]];
+  return [[inv, 1], ...store, ["PV_SUNTECH_720", pv], [dc, dcQty], [ac, 1], ["cable_cu_1500v_10mm", Math.round(pv * 4)], ["mc4_connector", Math.ceil(pv / 18) * 2]];
+};
+const comGroup = (kw: number, inv: string, ac: string, rows: [Store, number][]): Preset[] =>
+  rows.map(([s, pv]) => ({ type: "com", group: `منظومات تجارية ${kw} كيلو`, title: `${kw} كيلو + ${s.cab ? "كبينة " : ""}${s.kwh} كيلو تخزين · ${pv} لوح`, items: com(kw, inv, ac, s, pv) }));
+const HV = (n: number): Store => ({ n, kwh: n * 16 });
+const COMMERCIAL: Preset[] = [
+  ...[2, 3, 4].map((n) => ({ type: "com" as const, group: "منظومات تجارية 12 كيلو (جهد عالي)", title: `12 كيلو 3 فاز + ${n * 16} كيلو هاي فولتج · ${n * 8} لوح`, items: com(12, "INV_DEYE_12K_3P", "ac_04", HV(n), n * 8) })),
+  ...comGroup(50, "INV_SOLIS_50K_3P_HV", "ac_06", [[HV(2), 50], [HV(3), 60], [HV(4), 70], [HV(5), 80], [HV(6), 90], [{ cab: "CAB_HITHIUM_112", kwh: 112 }, 100], [HV(8), 110], [HV(9), 120], [HV(10), 130], [HV(12), 140]]),
+  ...comGroup(80, "INV_SOLIS_80K_3P_HV", "ac_10", [[HV(4), 90], [HV(5), 100], [HV(6), 110], [{ cab: "CAB_HITHIUM_112", kwh: 112 }, 120], [HV(8), 130], [HV(10), 150], [HV(12), 170], [HV(14), 190], [{ cab: "CAB_PYLON_261", kwh: 261 }, 210], [{ cab: "CAB_PYLON_313", kwh: 313 }, 230]]),
+  ...comGroup(125, "INV_SOLIS_125K_3P_HV", "ac_15", [[HV(6), 140], [{ cab: "CAB_HITHIUM_112", kwh: 112 }, 160], [HV(8), 180], [HV(10), 200], [HV(12), 221], [HV(14), 240], [HV(16), 260], [{ cab: "CAB_PYLON_261", kwh: 261 }, 280], [{ cab: "CAB_PYLON_313", kwh: 313 }, 300], [HV(24), 340]]),
+];
+PRESETS.push(...COMMERCIAL);
 
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
   const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
@@ -208,6 +227,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showHist, setShowHist] = useState(false);
+  const [presetTab, setPresetTab] = useState<"res" | "com">("res");
   const [share, setShare] = useState(false);
   const [shareQ, setShareQ] = useState("");
 
@@ -319,8 +339,12 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           <button onClick={() => setShowHist((v) => !v)} className="mr-auto flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض الجاهزة ({PRESETS.length})</button>
         </div>
         {showHist && (
-          <div className="max-h-72 overflow-y-auto rounded-xl border bg-muted/30 p-2 animate-in fade-in slide-in-from-top-2">
-            {[...new Set(PRESETS.map((p) => p.group))].map((g) => (
+          <div className="max-h-96 overflow-y-auto rounded-xl border bg-muted/30 p-2 animate-in fade-in slide-in-from-top-2">
+            <div className="mb-2 grid grid-cols-2 gap-1">
+              {(["res", "com"] as const).map((k) => (
+                <button key={k} onClick={() => setPresetTab(k)} className={`rounded-lg px-3 py-1.5 text-sm font-bold ${presetTab === k ? "bg-primary text-primary-foreground" : "bg-card border"}`}>{k === "res" ? "منظومات سكنية" : "منظومات تجارية"}</button>))}
+            </div>
+            {[...new Set(PRESETS.filter((p) => (p.type ?? "res") === presetTab).map((p) => p.group))].map((g) => (
               <div key={g} className="mb-2">
                 <div className="px-2 py-1 text-xs font-bold text-primary">{g}</div>
                 <div className="grid gap-1 sm:grid-cols-2">
