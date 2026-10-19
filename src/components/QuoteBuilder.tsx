@@ -55,29 +55,29 @@ const PRESETS: Preset[] = [
   { group: "إنفرتر 12 كيلو", title: "12 كيلو — بطارية 48 · 27 لوح 720W", items: deye("INV_DEYE_12K_1P", 3, 27, "DCBOX_1000_4", 3) },
 ];
 
-// Commercial: Hithium HV batteries (16 kWh each) + HV control, or ready-made storage cabinets.
-type Store = { n?: number; cab?: string; kwh: number };
-const com = (kw: number, inv: string, ac: string, s: Store, pv: number, invQty = 1): [string, number][] => {
-  const dc = pv <= 60 ? "DCBOX_1500_4" : pv <= 120 ? "DCBOX_1500_6" : pv <= 200 ? "DCBOX_1500_8" : "DCBOX_1500_10";
-  const dcQty = Math.max(invQty, Math.ceil(pv / 250));
-  const store: [string, number][] = s.cab ? [[s.cab, 1]] : [["BAT_HITHIUM_16K_HV", s.n!], ["ctrl_hithium_hv16", Math.max(1, Math.ceil(s.n! / 15))], ["bat_protect_dc1500_250a", 1]];
-  return [[inv, invQty], ...store, ["PV_SUNTECH_720", pv], [dc, dcQty], [ac, invQty], ["cable_cu_1500v_10mm", Math.round(pv * 4)], ["mc4_connector", Math.ceil(pv / 18) * 2]];
-};
-const HV = (n: number): Store => ({ n, kwh: n * 16 });
-// Bot's commercial sizing (from its real replies): panels ≈ daily kWh / 3.5, inverters = ceil(PV kW / (2×rating)),
-// Hithium HV 16 kWh batteries ≈ daily × 0.35 / 16 (0.26 for 125 kW). e.g. 741 kWh/day → 125 kW: 221 panels + 12 batteries.
-const botSize = (kw: number, inv: string, ac: string, daily: number[], batK: number): Preset[] =>
-  daily.map((d) => {
-    const pv = Math.round(d / 3.5);
-    const invQty = Math.max(1, Math.ceil((pv * 0.72) / (kw * 2)));
-    const n = Math.max(2, Math.round((d * batK) / 16));
-    return { type: "com", group: `منظومات تجارية ${kw} كيلو`, title: `${invQty > 1 ? invQty + "× " : ""}${kw} كيلو · استهلاك ${d} ك.و/يوم · ${n * 16} كيلو تخزين · ${pv} لوح`, items: com(kw, inv, ac, HV(n), pv, invQty) };
-  });
+// Commercial presets copied from real bot quotes (exact quantities). Cable is always 1 m = price per metre.
+type Store = { hv?: number; ctrl?: number; ebc?: number; bdc?: number; other?: [string, number][] };
+const com = (inv: string, invQty: number, ac: string, pv: number, dcQty: number, mc4: number, s: Store): [string, number][] => [
+  ["PV_SUNTECH_720", pv], [inv, invQty],
+  ...(s.hv ? [["BAT_HITHIUM_16K_HV", s.hv] as [string, number]] : []),
+  ...(s.other ?? []),
+  ["DCBOX_1500_10", dcQty], [ac, 1],
+  ...(s.ctrl ? [["ctrl_hithium_hv16", s.ctrl] as [string, number]] : []),
+  ...(s.ebc ? [["ctrl_hithium_hv16_ebc", s.ebc] as [string, number]] : []),
+  ...(s.bdc ? [["bat_protect_dc1500_250a", s.bdc] as [string, number]] : []),
+  ["mc4_connector", mc4], ["cable_cu_1500v_10mm", 1],
+];
+const S50 = "INV_SOLIS_50K_3P_HV", S125 = "INV_SOLIS_125K_3P_HV";
+const g50 = "منظومات تجارية 50 كيلو", g125 = "منظومات تجارية 125 كيلو";
 const COMMERCIAL: Preset[] = [
-  ...[2, 3, 4].map((n) => ({ type: "com" as const, group: "منظومات تجارية 12 كيلو (جهد عالي)", title: `12 كيلو 3 فاز + ${n * 16} كيلو هاي فولتج · ${n * 8} لوح`, items: com(12, "INV_DEYE_12K_3P", "ac_04", HV(n), n * 8) })),
-  ...botSize(50, "INV_SOLIS_50K_3P_HV", "ac_06", [150, 200, 250, 300, 350, 400, 450, 500, 600, 741], 0.35),
-  ...botSize(80, "INV_SOLIS_80K_3P_HV", "ac_10", [250, 320, 400, 480, 560, 640, 741, 850, 950, 1100], 0.35),
-  ...botSize(125, "INV_SOLIS_125K_3P_HV", "ac_15", [400, 500, 600, 741, 850, 950, 1100, 1250, 1400, 1600], 0.26),
+  { type: "com", group: g50, title: "50 كيلو · 75 لوح · 4 بطارية هيثيوم (64 كيلو)", items: com(S50, 1, "ac_06", 75, 1, 5, { hv: 4, ctrl: 1, bdc: 1 }) },
+  { type: "com", group: g50, title: "2× 50 كيلو · 150 لوح · 8 بطارية هيثيوم (128 كيلو)", items: com(S50, 2, "ac_06", 150, 1, 10, { hv: 8, ctrl: 1, ebc: 1, bdc: 1 }) },
+  { type: "com", group: g50, title: "2× 50 كيلو · 180 لوح · 12 بطارية هيثيوم (192 كيلو)", items: com(S50, 2, "ac_06", 180, 2, 12, { hv: 12, ctrl: 1, ebc: 1, bdc: 1 }) },
+  { type: "com", group: g50, title: "2× 50 كيلو · 180 لوح · كبينة بايلونتك 313 كيلو", items: com(S50, 2, "ac_06", 180, 2, 12, { other: [["CAB_PYLON_313", 1]] }) },
+  { type: "com", group: g50, title: "2× 50 كيلو · 180 لوح · 13 بطارية بايلونتك M5", items: com(S50, 2, "ac_06", 180, 2, 12, { other: [["BAT_PYLON_M5_15_68K", 13], ["CTRL_M5", 1]] }) },
+  { type: "com", group: g125, title: "125 كيلو · 221 لوح · 12 بطارية هيثيوم (192 كيلو)", items: com(S125, 1, "ac_15", 221, 2, 13, { hv: 12, ctrl: 1, ebc: 1, bdc: 1 }) },
+  { type: "com", group: g125, title: "2× 125 كيلو · 442 لوح · 24 بطارية هيثيوم (384 كيلو)", items: com(S125, 2, "ac_15", 442, 3, 26, { hv: 24, ctrl: 2, ebc: 2, bdc: 2 }) },
+  { type: "com", group: g125, title: "2× 125 كيلو · 646 لوح · 36 بطارية هيثيوم (576 كيلو)", items: com(S125, 2, "ac_15", 646, 4, 38, { hv: 36, ctrl: 3, ebc: 3, bdc: 3 }) },
 ];
 PRESETS.push(...COMMERCIAL);
 
