@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Search, FilePlus2, Save, Minus, Plus, Trash2, Check, Zap, Battery, Sun, Box, ShieldCheck, Server, Home, Cpu, Cable, Wrench, Printer, History, Share2, X, Download } from "lucide-react";
-import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment, ensureCustomerByPhone } from "@/lib/crm.functions";
+import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment, ensureCustomerByPhone, uploadQuotePdf } from "@/lib/crm.functions";
 import logoClean from "@/assets/actes-logo-clean.png";
 
 type Row = Awaited<ReturnType<typeof listCatalog>>[number];
@@ -228,7 +228,7 @@ async function quotePdfBase64(no: string, cust: { name: string; phone: string; c
 }
 
 export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCustomerId?: string | null }) {
-  const listC = useServerFn(listCatalog), listCu = useServerFn(listCustomers), save = useServerFn(saveQuote), sendA = useServerFn(sendAttachment), listQ = useServerFn(listQuotes), ensureC = useServerFn(ensureCustomerByPhone);
+  const listC = useServerFn(listCatalog), listCu = useServerFn(listCustomers), save = useServerFn(saveQuote), sendA = useServerFn(sendAttachment), listQ = useServerFn(listQuotes), ensureC = useServerFn(ensureCustomerByPhone), upPdf = useServerFn(uploadQuotePdf);
   const [sharePhone, setSharePhone] = useState("");
   const { data: rows = [] } = useQuery({ queryKey: ["catalog"], queryFn: () => listC({ data: { pw } }) });
   const { data: customers = [], refetch: refetchCu } = useQuery({ queryKey: ["quote-customers"], queryFn: () => listCu({ data: { pw } }) });
@@ -335,10 +335,21 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   };
   const openWhatsApp = async () => {
     if (!chosen.length) return setMsg("اختر صنفا واحدا على الأقل");
+    let ph = (sharePhone || cust.phone).replace(/\D/g, "").replace(/^00/, "");
+    if (/^0?7\d{8}$/.test(ph)) ph = "967" + ph.replace(/^0/, "");
+    if (ph && !/^\d{9,15}$/.test(ph)) return setMsg("رقم غير صحيح");
+    // Open the tab synchronously so the browser doesn't block it after the upload.
+    const tab = ph ? window.open("about:blank", "_blank") : null;
     setBusy(true); setMsg(null);
     try {
       const num = no ?? "ACTES-Q-" + Date.now().toString().slice(-6);
       const b64 = await quotePdfBase64(num, cust, chosen, notes);
+      if (ph) {
+        const { url } = await upPdf({ data: { pw, file_name: `عرض سعر ${num}.pdf`, b64 } });
+        const wa = `https://wa.me/${ph}?text=${encodeURIComponent(`عرض سعر ${num} — ACTES\n${url}`)}`;
+        if (tab) tab.location.href = wa; else window.location.href = wa;
+        return;
+      }
       const bin = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
       const file = new File([bin], `عرض سعر ${num}.pdf`, { type: "application/pdf" });
       if (navigator.canShare?.({ files: [file] })) {
