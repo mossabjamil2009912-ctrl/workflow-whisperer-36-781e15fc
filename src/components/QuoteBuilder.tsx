@@ -33,6 +33,24 @@ const specRow = (s: string) => {
   return `<div class="sl">${body}</div>`;
 };
 
+type Preset = { group: string; title: string; items: [string, number][] };
+const sys = (inv: string, bat: string, bq: number, pv: number, dc: string, ac: string): [string, number][] => [[inv, 1], [bat, bq], ["PV_SUNTECH_720", pv], [dc, 1], [ac, 1], ["cable_cu_1500v_10mm", 50], ["mc4_connector", 4]];
+const PRESETS: Preset[] = [
+  { group: "منظومات 1.6 كيلو", title: "1.6 كيلو + بطارية 1.28 كيلو", items: sys("INV_LIPOWER_1_6K", "BAT_RV12100", 1, 2, "DCBOX_1000_2", "ac_01") },
+  { group: "منظومات 1.6 كيلو", title: "1.6 كيلو + بطارية 2.56 كيلو", items: sys("INV_LIPOWER_1_6K", "BAT_RV12200", 1, 2, "DCBOX_1000_2", "ac_01") },
+  { group: "منظومات 6.2 كيلو", title: "6.2 كيلو + بطارية 5.12 كيلو", items: sys("INV_LIPOWER_6_2K", "BAT_UF5000", 1, 6, "DCBOX_1000_2", "ac_01") },
+  { group: "منظومات 6.2 كيلو", title: "6.2 كيلو + بطارية 10.24 كيلو", items: sys("INV_LIPOWER_6_2K", "BAT_UF5000", 2, 6, "DCBOX_1000_2", "ac_01") },
+  { group: "منظومات 6.2 كيلو", title: "6.2 كيلو + بطارية 16 كيلو", items: sys("INV_LIPOWER_6_2K", "BAT_FIDUS_16K", 1, 6, "DCBOX_1000_2", "ac_01") },
+  { group: "منظومات 8 كيلو", title: "8 كيلو + بطارية 16 كيلو", items: sys("INV_DEYE_8K_1P", "BAT_FIDUS_16K", 1, 10, "DCBOX_1000_2", "ac_02") },
+  { group: "منظومات 8 كيلو", title: "8 كيلو + بطارية 32 كيلو", items: sys("INV_DEYE_8K_1P", "BAT_FIDUS_16K", 2, 10, "DCBOX_1000_2", "ac_02") },
+  { group: "منظومات 12 كيلو سنجل فاز", title: "12 كيلو + بطارية 16 كيلو", items: sys("INV_DEYE_12K_1P", "BAT_FIDUS_16K", 1, 16, "DCBOX_1000_4", "ac_02") },
+  { group: "منظومات 12 كيلو سنجل فاز", title: "12 كيلو + بطارية 32 كيلو", items: sys("INV_DEYE_12K_1P", "BAT_FIDUS_16K", 2, 16, "DCBOX_1000_4", "ac_02") },
+  { group: "منظومات 12 كيلو سنجل فاز", title: "12 كيلو + بطارية 48 كيلو", items: sys("INV_DEYE_12K_1P", "BAT_FIDUS_16K", 3, 16, "DCBOX_1000_4", "ac_02") },
+  { group: "منظومات 12 كيلو ثري فاز", title: "12 كيلو 3 فاز + بطارية 16 كيلو", items: sys("INV_DEYE_12K_3P", "BAT_FIDUS_16K", 1, 16, "DCBOX_1000_4", "ac_04") },
+  { group: "منظومات 12 كيلو ثري فاز", title: "12 كيلو 3 فاز + بطارية 32 كيلو", items: sys("INV_DEYE_12K_3P", "BAT_FIDUS_16K", 2, 16, "DCBOX_1000_4", "ac_04") },
+  { group: "منظومات 12 كيلو ثري فاز", title: "12 كيلو 3 فاز + بطارية 48 كيلو", items: sys("INV_DEYE_12K_3P", "BAT_FIDUS_16K", 3, 16, "DCBOX_1000_4", "ac_04") },
+];
+
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
   const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
   const o = location.origin;
@@ -229,13 +247,13 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   const [no, setNo] = useState<string | null>(null);
   const [generated, setGenerated] = useState(false);
   const [preview, setPreview] = useState<{ url: string; name: string; html: string } | null>(null);
-  const generate = async () => {
-    if (!chosen.length) return setMsg("اختر صنفا واحدا على الأقل");
+  const generate = async (src: Line[] = chosen) => {
+    if (!src.length) return setMsg("اختر صنفا واحدا على الأقل");
     setBusy(true); setMsg("جارٍ إنشاء ملف PDF...");
     try {
       const num = no ?? "ACTES-Q-" + Date.now().toString().slice(-6);
       const url = "";
-      const { css, html } = await quoteDoc(num, cust, chosen, notes);
+      const { css, html } = await quoteDoc(num, cust, src, notes);
       const doc = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=760"><style>body{margin:0;background:#fff;padding:6mm 0}${css}</style></head><body>${html}</body></html>`;
             setPreview({ url, name: `عرض سعر ${num} - ${cust.name || "عميل"}.pdf`, html: doc });
       setGenerated(true); setMsg(null);
@@ -275,6 +293,17 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       setNo(r.quote_no); setMsg(`تم الحفظ: ${r.quote_no}`); void refetchQ();
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
   };
+  const loadPreset = (p: Preset) => {
+    const out: Line[] = [];
+    for (const [key, qty] of p.items) {
+      const r = items.find((x) => x.key === key);
+      if (r) out.push({ key: r.key, name: r.name, unit: r.unit, price: Number(r.price ?? 0), qty, specs: specsOf(r) });
+    }
+    if (!out.length) return setMsg("أصناف هذه المنظومة غير متوفرة في قائمة الأصناف");
+    setLines(Object.fromEntries(out.map((l) => [l.key, l])));
+    setShowHist(false);
+    void generate(out);
+  };
   const loadQuote = (qt: (typeof quotes)[number]) => {
     const its = (qt.items as unknown as Line[]) ?? [];
     setLines(Object.fromEntries(its.map((l) => [l.key, l])));
@@ -287,14 +316,18 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       <section className="flex min-h-0 flex-col gap-3">
         <div className="flex items-center gap-2">
           <h2 className="flex items-center gap-2 text-lg font-bold"><FilePlus2 className="h-5 w-5 text-primary" />إنشاء عرض سعر</h2>
-          <button onClick={() => setShowHist((v) => !v)} className="mr-auto flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض المحفوظة ({quotes.length})</button>
+          <button onClick={() => setShowHist((v) => !v)} className="mr-auto flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض الجاهزة ({PRESETS.length})</button>
         </div>
         {showHist && (
-          <div className="max-h-56 overflow-y-auto rounded-xl border bg-muted/30 p-2 animate-in fade-in slide-in-from-top-2">
-            {quotes.length === 0 ? <p className="p-3 text-center text-sm text-muted-foreground">لا توجد عروض محفوظة</p> : quotes.map((qt) => (
-              <button key={qt.id} onClick={() => loadQuote(qt)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-right text-sm hover:bg-card">
-                <span className="font-bold text-primary">{qt.quote_no}</span><span className="flex-1 truncate">{qt.customer_name || qt.phone || "-"}</span><span className="font-semibold">{usd(Number(qt.total))}</span>
-              </button>))}
+          <div className="max-h-72 overflow-y-auto rounded-xl border bg-muted/30 p-2 animate-in fade-in slide-in-from-top-2">
+            {[...new Set(PRESETS.map((p) => p.group))].map((g) => (
+              <div key={g} className="mb-2">
+                <div className="px-2 py-1 text-xs font-bold text-primary">{g}</div>
+                <div className="grid gap-1 sm:grid-cols-2">
+                  {PRESETS.filter((p) => p.group === g).map((p) => (
+                    <button key={p.title} onClick={() => loadPreset(p)} disabled={busy} className="rounded-lg border bg-card px-3 py-2 text-right text-sm font-semibold hover:border-primary hover:shadow disabled:opacity-50">{p.title}</button>))}
+                </div>
+              </div>))}
           </div>
         )}
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
@@ -373,7 +406,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
         </div>
         {msg && <p className="text-center text-xs font-semibold text-primary">{msg}</p>}
         <div className="grid grid-cols-2 gap-1.5">
-          <button onClick={generate} disabled={busy} className="flex items-center justify-center gap-1 rounded-md bg-primary py-1.5 text-xs font-bold text-primary-foreground shadow transition hover:opacity-90 disabled:opacity-50"><Printer className="h-3.5 w-3.5" />{busy && !share ? "جارٍ الإنشاء..." : "إنشاء عرض السعر"}</button>
+          <button onClick={() => generate()} disabled={busy} className="flex items-center justify-center gap-1 rounded-md bg-primary py-1.5 text-xs font-bold text-primary-foreground shadow transition hover:opacity-90 disabled:opacity-50"><Printer className="h-3.5 w-3.5" />{busy && !share ? "جارٍ الإنشاء..." : "إنشاء عرض السعر"}</button>
           <button onClick={() => (chosen.length ? setShare(true) : setMsg("اختر صنفا واحدا على الأقل"))} disabled={busy} className="flex items-center justify-center gap-1 rounded-md bg-ink py-1.5 text-xs font-bold text-ink-foreground transition hover:opacity-90 disabled:opacity-50"><Share2 className="h-3.5 w-3.5" />{busy && share ? "جارٍ الإرسال..." : "مشاركة مع عميل"}</button>
         </div>
         {share && (
