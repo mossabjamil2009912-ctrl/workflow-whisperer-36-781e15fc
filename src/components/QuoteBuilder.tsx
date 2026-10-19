@@ -230,7 +230,6 @@ async function quotePdfBase64(no: string, cust: { name: string; phone: string; c
 export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCustomerId?: string | null }) {
   const listC = useServerFn(listCatalog), listCu = useServerFn(listCustomers), save = useServerFn(saveQuote), sendA = useServerFn(sendAttachment), listQ = useServerFn(listQuotes), ensureC = useServerFn(ensureCustomerByPhone);
   const [sharePhone, setSharePhone] = useState("");
-  const [sharePhone, setSharePhone] = useState("");
   const { data: customers = [], refetch: refetchCu } = useQuery({ queryKey: ["quote-customers"], queryFn: () => listCu({ data: { pw } }) });
   const { data: quotes = [], refetch: refetchQ } = useQuery({ queryKey: ["quotes"], queryFn: () => listQ({ data: { pw } }) });
 
