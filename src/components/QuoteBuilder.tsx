@@ -100,37 +100,80 @@ function quoteHtml(no: string, cust: { name: string; phone: string; city: string
   return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${esc(no)}</title><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet"><style>@page{size:A4;margin:8mm 10mm}body{margin:0}${css}</style></head><body>${html}<script>document.fonts.ready.then(()=>setTimeout(()=>print(),300))</script></body></html>`;
 }
 
-async function quotePdfBase64(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
+const toDataUrl = async (url: string) => {
+  const b = await (await fetch(url)).blob();
+  return await new Promise<string>((r) => { const f = new FileReader(); f.onload = () => r(f.result as string); f.readAsDataURL(b); });
+};
+let assetCache: Promise<{ fontCss: string; imgs: Record<string, string> }> | null = null;
+// Fonts & images inlined as data URLs so preview and PDF render with identical fonts.
+function quoteAssets() {
+  if (!assetCache) assetCache = (async () => {
+    const o = location.origin;
+    const [ar, la, hdr, qr] = (await Promise.all([`${o}/fonts/cairo-ar.woff2`, `${o}/fonts/cairo-la.woff2`, `${o}/quote-header.jpg`, `${o}/quote-qr.jpg`].map(toDataUrl))) as [string, string, string, string];
+    const ff = (src: string, range: string) => `@font-face{font-family:Cairo;font-weight:200 1000;font-style:normal;src:url(${src}) format('woff2');unicode-range:${range}}`;
+    return {
+      fontCss: ff(ar, "U+0600-06FF,U+0750-077F,U+08A0-08FF,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC") + ff(la, "U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122,U+2212"),
+      imgs: { [`${o}/quote-header.jpg`]: hdr, [`${o}/quote-qr.jpg`]: qr } as Record<string, string>,
+    };
+  })().catch((e) => { assetCache = null; throw e; });
+  return assetCache!;
+}
+
+async function quoteDoc(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
   const { css, html } = quoteBody(no, cust, lines, notes);
-  // Isolated iframe: app styles use oklch() colors which html2canvas cannot parse.
+  const { fontCss, imgs } = await quoteAssets();
+  let h = html;
+  for (const [u, d] of Object.entries(imgs)) h = h.split(u).join(d);
+  return { css: fontCss + css, html: h };
+}
+
+async function quotePdfBase64(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
+  const { css, html } = await quoteDoc(no, cust, lines, notes);
+  const W = 760; // ~ 201mm at 96dpi: page content width
+  // Measure height with the real browser layout.
   const frame = document.createElement("iframe");
-  frame.style.cssText = "position:fixed;left:-10000px;top:0;width:820px;height:1200px;border:0";
+  frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${W}px;height:1200px;border:0`;
   document.body.appendChild(frame);
+  let H = 1100;
   try {
     const doc = frame.contentDocument!;
     doc.open();
-    doc.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap"><base href="${location.origin}/"><style>${css}</style></head><body style="margin:0;background:#fff">${html}</body></html>`);
+    doc.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><style>body{margin:0;background:#fff}${css}</style></head><body>${html}</body></html>`);
     doc.close();
-    await new Promise((r) => { if (doc.readyState === "complete") r(null); else frame.onload = () => r(null); setTimeout(r, 3000); });
     await doc.fonts.ready;
-    await Promise.all([...doc.querySelectorAll("img")].map((im) => (im.complete ? null : new Promise((r) => { im.onload = im.onerror = r; }))));
-    // Render directly inside the iframe document so app (oklch) styles are never parsed.
-    const html2canvas = (await import("html2canvas")).default;
-    const { jsPDF } = await import("jspdf");
-    const el = doc.querySelector(".qt") as HTMLElement;
-    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff", window: frame.contentWindow! } as never);
-    const pdf = new jsPDF({ unit: "mm", format: "a4" });
-    const mx = 10, my = 8, pw = 210 - mx * 2, ph = 297 - my * 2;
-    const pxPerMm = canvas.width / pw, pagePx = Math.floor(ph * pxPerMm);
-    for (let y = 0, i = 0; y < canvas.height; y += pagePx, i++) {
-      const h = Math.min(pagePx, canvas.height - y);
-      const c = document.createElement("canvas"); c.width = canvas.width; c.height = h;
-      const ctx = c.getContext("2d")!; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, h); ctx.drawImage(canvas, 0, -y);
-      if (i) pdf.addPage();
-      pdf.addImage(c.toDataURL("image/jpeg", 0.95), "JPEG", mx, my, pw, h / pxPerMm);
-    }
-    return pdf.output("datauristring").split(",")[1]!;
+    await Promise.all([...doc.images].map((im) => (im.complete ? null : new Promise((r) => { im.onload = im.onerror = r; }))));
+    await new Promise((r) => setTimeout(r, 150));
+    H = Math.ceil((doc.querySelector(".qt") as HTMLElement).getBoundingClientRect().height) + 4;
   } finally { frame.remove(); }
+
+  // Render via SVG foreignObject: the browser's own text engine (correct Arabic shaping & bidi).
+  const xhtml = new XMLSerializer().serializeToString(
+    new DOMParser().parseFromString(`<div xmlns="http://www.w3.org/1999/xhtml" dir="rtl" style="width:${W}px;background:#fff"><style>${css}</style>${html}</div>`, "text/html").body.firstElementChild!,
+  );
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
+  const img = new Image();
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  await img.decode();
+  await new Promise((r) => setTimeout(r, 100));
+  const scale = 2.5;
+  const canvas = document.createElement("canvas");
+  canvas.width = W * scale; canvas.height = H * scale;
+  const cx = canvas.getContext("2d")!;
+  cx.fillStyle = "#fff"; cx.fillRect(0, 0, canvas.width, canvas.height);
+  cx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const { jsPDF } = await import("jspdf");
+  const pdf = new jsPDF({ unit: "mm", format: "a4" });
+  const mx = 5, my = 6, pw = 210 - mx * 2, ph = 297 - my * 2;
+  const pxPerMm = canvas.width / pw, pagePx = Math.floor(ph * pxPerMm);
+  for (let y = 0, i = 0; y < canvas.height; y += pagePx, i++) {
+    const h = Math.min(pagePx, canvas.height - y);
+    const c = document.createElement("canvas"); c.width = canvas.width; c.height = h;
+    const ctx = c.getContext("2d")!; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, h); ctx.drawImage(canvas, 0, -y);
+    if (i) pdf.addPage();
+    pdf.addImage(c.toDataURL("image/jpeg", 0.95), "JPEG", mx, my, pw, h / pxPerMm);
+  }
+  return pdf.output("datauristring").split(",")[1]!;
 }
 
 export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCustomerId?: string | null }) {
@@ -197,8 +240,8 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       const bin = atob(b64); const arr = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
       const url = URL.createObjectURL(new Blob([arr], { type: "application/pdf" }));
-      const { css, html } = quoteBody(num, cust, chosen, notes);
-      const doc = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=820"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap"><style>body{margin:0;background:#fff;padding:8mm 0}${css}</style></head><body>${html}</body></html>`;
+      const { css, html } = await quoteDoc(num, cust, chosen, notes);
+      const doc = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=760"><style>body{margin:0;background:#fff;padding:6mm 0}${css}</style></head><body>${html}</body></html>`;
       if (preview) URL.revokeObjectURL(preview.url);
       setPreview({ url, name: `عرض سعر ${num} - ${cust.name || "عميل"}.pdf`, html: doc });
       setGenerated(true); setMsg(null);
