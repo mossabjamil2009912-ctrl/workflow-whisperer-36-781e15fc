@@ -75,6 +75,13 @@ export function Catalog({ pw }: { pw: string }) {
   const card = (r: Row) => (
     <div key={r.key} className={`rounded-xl border bg-card p-3 ${r.active ? "" : "opacity-60"}`}>
       <p className="text-sm font-medium">{r.name}</p>
+      {(() => {
+        const m = specsOf(r).join(" ").match(/(\d+)\s*خط دخول\s*(\d+)\s*خط خروج/);
+        if (!m) return null;
+        const n = Number(m[1]);
+        const g = n === 2 ? "مجموعتان" : n <= 10 ? `${n} مجموعات` : `${n} مجموعة`;
+        return <p className="mt-1 text-xs font-medium text-primary">عدد المجموعات: {g} ({m[1]} دخول / {m[2]} خروج)</p>;
+      })()}
       <div className="mt-2 flex items-center gap-2 text-sm">
         {r.kind === "item" && <span className="text-muted-foreground">${r.price ?? "-"} / {r.unit}</span>}
         {r.kind === "datasheet" && r.pdf_url && <a href={r.pdf_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary"><FileText className="h-3.5 w-3.5" /> فتح</a>}
