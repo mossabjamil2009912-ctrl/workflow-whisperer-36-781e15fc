@@ -112,7 +112,7 @@ export const presetForDaily = (n: number): Preset => {
 };
 // Bot entry paths. Residential: monthly bill (YER) → daily need = bill ÷ KWH_PRICE ÷ 30 → resNearest.
 // Commercial (com_1 bill / com_2 kWh per month / com_3 diesel litres) → kWh/month → ÷30 → smallest covering.
-export const KWH_PRICE = 290;
+export const KWH_PRICE = 250;
 export const presetForResBill = (bill: number) => presetForDaily(bill / KWH_PRICE / 30);
 export type ComMethod = "bill" | "kwh" | "diesel";
 export const presetForCom = (m: ComMethod, v: number): Preset => {
