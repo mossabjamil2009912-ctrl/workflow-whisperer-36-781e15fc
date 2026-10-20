@@ -38,6 +38,33 @@ type Preset = { type?: "res" | "com"; group: string; title: string; items: [stri
 // All ready-made systems come verbatim from the bot (names, specs, quantities, prices) — see bot-presets.ts.
 const PRESETS: Preset[] = BOT_PRESETS.map((p) => ({ ...p }));
 
+// Links each bot line to its catalog item so ready-made systems always use live catalog prices.
+export const catalogKeyFor = (l: { name: string; price: number; specs: string[] }): string | null => {
+  const t = l.name + " " + l.specs.slice(0, 2).join(" ");
+  const has = (s: string) => t.includes(s);
+  if (has("595")) return "PV_SUNTECH_595";
+  if (has("720")) return "PV_SUNTECH_720";
+  if (has("ليو باور 1.6")) return "INV_LIPOWER_1_6K";
+  if (has("ليو باور 6.2")) return "INV_LIPOWER_6_2K";
+  if (has("RV12100")) return "BAT_RV12100";
+  if (has("RV12200")) return "BAT_RV12200";
+  if (has("NeoPower 4")) return "BAT_HEROEE_4K";
+  if (has("UF5000")) return "BAT_UF5000";
+  if (has("Fidus")) return "BAT_FIDUS_16K";
+  if (has("HeroEE 16")) return "BAT_HITHIUM_16K_LV";
+  for (const [m, k] of [["SUN-8K-SG02LP1", "INV_DEYE_8K_1P"], ["SUN-12K-SG01LP1", "INV_DEYE_12K_1P"], ["SUN-16K-SG01LP1", "INV_DEYE_16K_1P"], ["SUN-12K-SG04LP3", "INV_DEYE_12K_3P"], ["SUN-16K-SG05LP3", "INV_DEYE_16K_3P"], ["SUN-20K-SG05LP3", "INV_DEYE_20K_3P"]] as const) if (has(m)) return k;
+  if (has("استند 100 أمبير")) return "STAND_100A";
+  if (has("استند 200 أمبير")) return "STAND_200A";
+  if (has("استند 314 أمبير")) return "STAND_314A";
+  if (has("استند منظومة ليثيوم 6")) return "STAND_LITHIUM_6K";
+  if (has("MC4")) return "mc4_connector";
+  if (has("10 مم") && has("كابل")) return "cable_cu_1500v_10mm";
+  if (has("صندوق حماية - تيار مستمر") && l.price === 80) return "DCBOX_1000_2";
+  if ((has("سنجل فاز") && has("لوحة حماية")) && (l.price === 35 || has("2P-63AH"))) return "ac_01";
+  if (has("4P-63AH")) return "ac_03";
+  return null;
+};
+
 // Commercial presets copied from real bot quotes (exact items and quantities). Cable is always 1 m = price per metre.
 type Store = { dc: [string, number][]; hv?: number; ctrl?: number; ebc?: number; bdc?: number; other?: [string, number][] };
 const com = (inv: string, invQty: number, ac: string, pv: number, mc4: number, s: Store): [string, number][] => [
@@ -367,7 +394,10 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
   };
   const loadPreset = (p: Preset) => {
-    const out: Line[] = p.lines ? p.lines.map((l) => ({ ...l })) : [];
+    const out: Line[] = p.lines ? p.lines.map((l) => {
+      const k = catalogKeyFor(l), r = k ? items.find((x) => x.key === k) : null;
+      return r && r.price != null ? { ...l, key: l.key, price: Number(r.price) } : { ...l };
+    }) : [];
     if (!p.lines) for (const [key, qty] of p.items) {
       const r = items.find((x) => x.key === key);
       if (r) out.push({ key: r.key, name: r.name, unit: r.unit, price: Number(r.price ?? 0), qty, specs: specsOf(r) });
