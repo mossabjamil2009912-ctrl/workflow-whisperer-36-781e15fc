@@ -395,9 +395,10 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
   };
   const loadPreset = (p: Preset) => {
+    // Like the bot: every linked line takes name, specs, unit and price live from the catalog.
     const out: Line[] = p.lines ? p.lines.map((l) => {
       const k = catalogKeyFor(l), r = k ? items.find((x) => x.key === k) : null;
-      return r && r.price != null ? { ...l, key: l.key, price: Number(r.price) } : { ...l };
+      return r ? { key: l.key, name: r.name, unit: r.unit ?? l.unit, price: Number(r.price ?? l.price), qty: l.qty, specs: specsOf(r).length ? specsOf(r) : l.specs } : { ...l };
     }) : [];
     if (!p.lines) for (const [key, qty] of p.items) {
       const r = items.find((x) => x.key === key);
