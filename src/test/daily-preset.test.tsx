@@ -16,3 +16,10 @@ describe("presetForDaily — bot formulas with daily kWh input", () => {
   });
   it("300 kWh → commercial covering ≥ 300 (594)", () => expect(prod(300)).toBeCloseTo(594));
 });
+
+import { presetForCom, presetForResBill } from "@/components/QuoteBuilder";
+describe("bot entry paths", () => {
+  it("commercial 150 kWh/month → 8k covering 5/day (31.68)", () => expect(dailyProduction(presetForCom("kwh", 150))).toBeCloseTo(31.68));
+  it("commercial result is always commercial", () => expect(presetForCom("diesel", 100).type).toBe("com"));
+  it("residential bill 8700 YER → need 1/day → 1.6 system", () => expect(dailyProduction(presetForResBill(8700))).toBeCloseTo(3.2725));
+});
