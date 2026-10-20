@@ -61,7 +61,7 @@ export const catalogKeyFor = (l: { name: string; price: number; specs: string[] 
   if (has("10 مم") && has("كابل")) return "cable_cu_1500v_10mm";
   if (has("6 مم") && has("كابل")) return "cable_cu_1500v_6mm";
   if (has("صندوق حماية - تيار مستمر") && l.price === 80) return "DCBOX_1000_2";
-  if (has("صندوق حماية - تيار مستمر") && l.price === 45) return "DCBOX_1000_4";
+  if (has("صندوق حماية - تيار مستمر") && l.price === 45) return "DCBOX_1000_4_45";
   if (has("صندوق حماية - تيار مستمر") && l.price === 120) return "DCBOX_1000_4_PRO";
   if ((has("سنجل فاز") && has("لوحة حماية")) && (l.price === 35 || has("2P-63AH"))) return "ac_01";
   if (has("4P-63AH")) return "ac_03";
