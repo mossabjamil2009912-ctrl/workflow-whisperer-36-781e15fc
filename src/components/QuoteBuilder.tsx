@@ -110,6 +110,17 @@ export const presetForDaily = (n: number): Preset => {
   const com = PRESETS.filter((p) => p.type === "com").sort((a, b) => dailyProduction(a) - dailyProduction(b));
   return com.find((p) => dailyProduction(p) >= n) ?? com[com.length - 1]!;
 };
+// Bot entry paths. Residential: monthly bill (YER) → daily need = bill ÷ KWH_PRICE ÷ 30 → resNearest.
+// Commercial (com_1 bill / com_2 kWh per month / com_3 diesel litres) → kWh/month → ÷30 → smallest covering.
+export const KWH_PRICE = 290;
+export const presetForResBill = (bill: number) => presetForDaily(bill / KWH_PRICE / 30);
+export type ComMethod = "bill" | "kwh" | "diesel";
+export const presetForCom = (m: ComMethod, v: number): Preset => {
+  const kwh = m === "bill" ? v / KWH_PRICE : m === "kwh" ? v : v / 0.27;
+  const need = kwh / 30;
+  const com = PRESETS.filter((p) => p.type === "com").sort((a, b) => dailyProduction(a) - dailyProduction(b));
+  return com.find((p) => dailyProduction(p) >= need - 0.0001) ?? com[com.length - 1]!;
+};
 
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
   const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
@@ -271,6 +282,8 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   const [showHist, setShowHist] = useState(false);
   const [presetTab, setPresetTab] = useState<"res" | "com">("res");
   const [daily, setDaily] = useState("");
+  const [path, setPath] = useState<"res" | "com" | null>(null);
+  const [comM, setComM] = useState<ComMethod | null>(null);
   const [share, setShare] = useState(false);
   const [shareQ, setShareQ] = useState("");
 
@@ -424,10 +437,20 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
       <section className="flex min-h-0 flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="flex items-center gap-2 text-lg font-bold"><FilePlus2 className="h-5 w-5 text-primary" />إنشاء عرض سعر</h2>
-          <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (n > 0) loadPreset(presetForDaily(n)); }} className="mr-auto flex items-center gap-1">
-            <input value={daily} onChange={(e) => setDaily(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="استهلاك يومي (كيلو)" className="w-32 rounded-lg border bg-card px-2 py-1.5 text-xs" />
-            <button type="submit" className="rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground">عرض</button>
-          </form>
+          <div className="mr-auto flex flex-wrap items-center gap-1">
+            {(["res", "com"] as const).map((k) => (
+              <button key={k} type="button" onClick={() => { setPath(path === k ? null : k); setComM(null); setDaily(""); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${path === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{k === "res" ? "سكني" : "تجاري"}</button>
+            ))}
+            {path === "com" && (["bill", "kwh", "diesel"] as const).map((m) => (
+              <button key={m} type="button" onClick={() => { setComM(m); setDaily(""); }} className={`rounded-lg border px-2 py-1.5 text-xs font-semibold ${comM === m ? "border-primary bg-primary/10 text-primary" : "bg-card"}`}>{m === "bill" ? "فاتورة" : m === "kwh" ? "استهلاك شهري" : "الديزل"}</button>
+            ))}
+            {(path === "res" || (path === "com" && comM)) && (
+              <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (!(n > 0)) return; loadPreset(path === "res" ? presetForResBill(n) : presetForCom(comM!, n)); }} className="flex items-center gap-1">
+                <input autoFocus value={daily} onChange={(e) => setDaily(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder={path === "res" || comM === "bill" ? "الفاتورة الشهرية (ريال)" : comM === "kwh" ? "الاستهلاك الشهري (كيلووات)" : "الديزل الشهري (لتر)"} className="w-40 rounded-lg border bg-card px-2 py-1.5 text-xs" />
+                <button type="submit" className="rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground">عرض</button>
+              </form>
+            )}
+          </div>
           <button onClick={() => setShowHist((v) => !v)} className="flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض الجاهزة ({PRESETS.length})</button>
         </div>
         {showHist && (
