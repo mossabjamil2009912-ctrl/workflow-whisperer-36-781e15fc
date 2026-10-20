@@ -12,7 +12,7 @@ describe("presetForDaily — bot formulas with daily kWh input", () => {
   it("100 kWh → 12k 27 panels", () => expect(t(100)).toContain("27 لوح"));
   it("above residential max goes commercial, smallest covering", () => {
     expect(presetForDaily(120).type).toBe("com");
-    expect(prod(120)).toBeCloseTo(297);
+    expect(prod(120)).toBeCloseTo(130.68);
   });
   it("300 kWh → commercial covering ≥ 300 (594)", () => expect(prod(300)).toBeCloseTo(594));
 });

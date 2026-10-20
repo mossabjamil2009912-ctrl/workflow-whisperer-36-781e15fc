@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Search, FilePlus2, Save, Minus, Plus, Trash2, Check, Zap, Battery, Sun, Box, ShieldCheck, Server, Home, Cpu, Cable, Wrench, Printer, History, Share2, X, Download } from "lucide-react";
 import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment, ensureCustomerByPhone, uploadQuotePdf } from "@/lib/crm.functions";
+import { BOT_PRESETS } from "@/lib/bot-presets";
 import logoClean from "@/assets/actes-logo-clean.png";
 
 type Row = Awaited<ReturnType<typeof listCatalog>>[number];
@@ -33,30 +34,9 @@ const specRow = (s: string) => {
   return `<div class="sl">${body}</div>`;
 };
 
-type Preset = { type?: "res" | "com"; group: string; title: string; items: [string, number][] };
-// Residential presets mirror the bot's «المنظومات الجاهزة» menu exactly (same panels, batteries, protection, cable).
-// Small systems (1.6/6.2) carry real cable lengths (20/30 m) and the stand-with-protection item ($60/$100 in bot quotes);
-// 8k+ systems use the DC protection box ($80/$230) and 1 m cable (price per metre) — exactly as the bot quotes them.
-const small = (bat: string, pv: number, stand: string, cable: number): [string, number][] => [["PV_SUNTECH_595", pv], ["INV_LIPOWER_1_6K", 1], [bat, 1], [stand, 1], ["cable_cu_1500v_10mm", cable]];
-const mid = (bat: string, bq: number, pv: number): [string, number][] => [["PV_SUNTECH_720", pv], ["INV_LIPOWER_6_2K", 1], [bat, bq], ["STAND_LITHIUM_6K", 1], ["cable_cu_1500v_10mm", 30]];
-// Bot quotes: DC box ($80 → DCBOX_1000_2 / $230 → DCBOX_1000_4), AC $35, Fidus 16kWh batteries, MC4 kits, 1 m cable.
-const deye = (inv: string, bq: number, pv: number, dc: string, mc4: number): [string, number][] => [["PV_SUNTECH_720", pv], [dc, 1], [inv, 1], ["ac_01", 1], ["BAT_FIDUS_16K", bq], ["mc4_connector", mc4], ["cable_cu_1500v_10mm", 1]];
-const PRESETS: Preset[] = [
-  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 1.28 · 1 لوح 595W", items: small("BAT_RV12100", 1, "STAND_100A", 20) },
-  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 2.56 · 1 لوح 595W", items: small("BAT_RV12200", 1, "STAND_200A", 20) },
-  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 2.56 · 2 لوح 595W", items: small("BAT_RV12200", 2, "STAND_200A", 20) },
-  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 4 · 2 لوح 595W", items: small("BAT_HEROEE_4K", 2, "STAND_314A", 30) },
-  { group: "إنفرتر 1.6 كيلو", title: "1.6 كيلو — بطارية 4 · 3 لوح 595W", items: small("BAT_HEROEE_4K", 3, "STAND_314A", 30) },
-  { group: "إنفرتر 6.2 كيلو", title: "6.2 كيلو — بطارية 5.12 · 4 لوح 720W", items: mid("BAT_UF5000", 1, 4) },
-  { group: "إنفرتر 6.2 كيلو", title: "6.2 كيلو — بطارية 10.24 · 5 لوح 720W", items: mid("BAT_UF5000", 2, 5) },
-  { group: "إنفرتر 6.2 كيلو", title: "6.2 كيلو — بطارية 16 · 6 لوح 720W", items: mid("BAT_FIDUS_16K", 1, 6) },
-  { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 16 · 8 لوح 720W", items: deye("INV_DEYE_8K_1P", 1, 8, "DCBOX_1000_2", 2) },
-  { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 16 · 9 لوح 720W", items: deye("INV_DEYE_8K_1P", 1, 9, "DCBOX_1000_2", 2) },
-  { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 32 · 14 لوح 720W", items: deye("INV_DEYE_8K_1P", 2, 14, "DCBOX_1000_2", 2) },
-  { group: "إنفرتر 8 كيلو", title: "8 كيلو — بطارية 32 · 16 لوح 720W", items: deye("INV_DEYE_8K_1P", 2, 16, "DCBOX_1000_2", 2) },
-  { group: "إنفرتر 12 كيلو", title: "12 كيلو — بطارية 32 · 18 لوح 720W", items: deye("INV_DEYE_12K_1P", 2, 18, "DCBOX_1000_2", 2) },
-  { group: "إنفرتر 12 كيلو", title: "12 كيلو — بطارية 48 · 27 لوح 720W", items: deye("INV_DEYE_12K_1P", 3, 27, "DCBOX_1000_4", 3) },
-];
+type Preset = { type?: "res" | "com"; group: string; title: string; items: [string, number][]; lines?: Line[]; panels?: number; pw?: number };
+// All ready-made systems come verbatim from the bot (names, specs, quantities, prices) — see bot-presets.ts.
+const PRESETS: Preset[] = BOT_PRESETS.map((p) => ({ ...p }));
 
 // Commercial presets copied from real bot quotes (exact items and quantities). Cable is always 1 m = price per metre.
 type Store = { dc: [string, number][]; hv?: number; ctrl?: number; ebc?: number; bdc?: number; other?: [string, number][] };
@@ -85,7 +65,7 @@ const COMMERCIAL: Preset[] = [
 PRESETS.push(...COMMERCIAL);
 // Bot formulas (State Machine), fed with daily kWh directly (no ÷30):
 // production = panels × panel W × 5.5 / 1000.
-export const dailyProduction = (p: Preset) =>
+export const dailyProduction = (p: Preset) => p.panels ? p.panels * (p.pw ?? 720) * 5.5 / 1000 :
   p.items.reduce((s, [k, q]) => s + (k === "PV_SUNTECH_595" ? q * 595 : k === "PV_SUNTECH_720" ? q * 720 : 0), 0) * 5.5 / 1000;
 const RES_MAX = Math.max(...PRESETS.filter((p) => p.type !== "com").map(dailyProduction));
 export const presetForDaily = (n: number): Preset => {
@@ -387,8 +367,8 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
   };
   const loadPreset = (p: Preset) => {
-    const out: Line[] = [];
-    for (const [key, qty] of p.items) {
+    const out: Line[] = p.lines ? p.lines.map((l) => ({ ...l })) : [];
+    if (!p.lines) for (const [key, qty] of p.items) {
       const r = items.find((x) => x.key === key);
       if (r) out.push({ key: r.key, name: r.name, unit: r.unit, price: Number(r.price ?? 0), qty, specs: specsOf(r) });
     }
