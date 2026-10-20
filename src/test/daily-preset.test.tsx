@@ -22,4 +22,6 @@ describe("bot entry paths", () => {
   it("commercial 150 kWh/month → 8k covering 5/day (31.68)", () => expect(dailyProduction(presetForCom("kwh", 150))).toBeCloseTo(31.68));
   it("commercial result is always commercial", () => expect(presetForCom("diesel", 100).type).toBe("com"));
   it("residential bill 8700 YER → need 1/day → 1.6 system", () => expect(dailyProduction(presetForResBill(8700))).toBeCloseTo(3.2725));
+  it("kWh price is 250 YER like the bot: 7500 YER/month → need 1/day → 1.6 system", () => expect(dailyProduction(presetForResBill(7500))).toBeCloseTo(3.2725));
+  it("commercial bill 37500 YER/month → 150 kWh → 8k covering 5/day", () => expect(dailyProduction(presetForCom("bill", 37500))).toBeCloseTo(31.68));
 });
