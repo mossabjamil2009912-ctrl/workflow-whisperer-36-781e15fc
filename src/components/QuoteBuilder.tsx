@@ -62,6 +62,7 @@ export const catalogKeyFor = (l: { name: string; price: number; specs: string[] 
   if (has("صندوق حماية - تيار مستمر") && l.price === 80) return "DCBOX_1000_2";
   if ((has("سنجل فاز") && has("لوحة حماية")) && (l.price === 35 || has("2P-63AH"))) return "ac_01";
   if (has("4P-63AH")) return "ac_03";
+  if (has("4P-100AH")) return "ac_04";
   return null;
 };
 
