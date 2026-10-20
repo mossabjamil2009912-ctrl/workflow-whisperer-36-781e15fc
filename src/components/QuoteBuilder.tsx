@@ -119,6 +119,8 @@ export const presetForCom = (m: ComMethod, v: number): Preset => {
   const kwh = m === "bill" ? v / KWH_PRICE : m === "kwh" ? v : v / 0.27;
   const need = kwh / 30;
   const com = PRESETS.filter((p) => p.type === "com").sort((a, b) => dailyProduction(a) - dailyProduction(b));
+  // Small commercial need (below the smallest commercial system) is treated exactly as residential.
+  if (need < dailyProduction(com[0]!) - 0.0001) return presetForDaily(need);
   return com.find((p) => dailyProduction(p) >= need - 0.0001) ?? com[com.length - 1]!;
 };
 
