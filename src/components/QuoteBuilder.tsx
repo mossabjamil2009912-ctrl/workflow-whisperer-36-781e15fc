@@ -83,16 +83,21 @@ const COMMERCIAL: Preset[] = [
   { type: "com", group: g125, title: "2× 125 كيلو · 646 لوح · 36 بطارية هيثيوم (576 كيلو)", items: com(S125, 2, "ac_15", 646, 38, { dc: [["DCBOX_1500_10", 4]], hv: 36, ctrl: 3, ebc: 3, bdc: 3 }) },
 ];
 PRESETS.push(...COMMERCIAL);
-// Daily consumption (kWh/day) → matching ready system.
-// 0–28 residential; up to 36 still max 2 batteries (32 kWh); commercial HV only above 36.
-const DAILY: [number, number][] = [
-  // Battery ≈ daily kWh: ~5 → 5.12, ~10 → 2×5.12, 13–20 → one 16, 21–36 → two 16.
-  [1.5, 0], [3, 2], [4, 4], [7.5, 5], [12, 6], [16, 7], [18, 8], [20, 9], [24, 10], [28, 11], [36, 12],
-  [120, 14], [180, 15], [250, 16], [400, 19], [700, 20],
-];
+// Bot formulas (State Machine), fed with daily kWh directly (no ÷30):
+// production = panels × panel W × 5.5 / 1000.
+export const dailyProduction = (p: Preset) =>
+  p.items.reduce((s, [k, q]) => s + (k === "PV_SUNTECH_595" ? q * 595 : k === "PV_SUNTECH_720" ? q * 720 : 0), 0) * 5.5 / 1000;
+const RES_MAX = Math.max(...PRESETS.filter((p) => p.type !== "com").map(dailyProduction));
 export const presetForDaily = (n: number): Preset => {
-  const hit = DAILY.find(([max]) => n <= max);
-  return PRESETS[hit ? hit[1] : 21]!;
+  const res = PRESETS.filter((p) => p.type !== "com");
+  if (n <= RES_MAX) {
+    // resNearest: closest production; 8/12 kW systems never below the need.
+    const ok = res.filter((p) => !/^إنفرتر (8|12) /.test(p.group) || dailyProduction(p) >= n);
+    return ok.reduce((b, p) => (Math.abs(dailyProduction(p) - n) < Math.abs(dailyProduction(b) - n) ? p : b));
+  }
+  // Commercial: smallest system whose production covers the need.
+  const com = PRESETS.filter((p) => p.type === "com").sort((a, b) => dailyProduction(a) - dailyProduction(b));
+  return com.find((p) => dailyProduction(p) >= n) ?? com[com.length - 1]!;
 };
 
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
