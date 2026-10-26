@@ -98,30 +98,62 @@ PRESETS.push(...COMMERCIAL);
 // production = panels × panel W × 5.5 / 1000.
 export const dailyProduction = (p: Preset) => p.panels ? p.panels * (p.pw ?? 720) * 5.5 / 1000 :
   p.items.reduce((s, [k, q]) => s + (k === "PV_SUNTECH_595" ? q * 595 : k === "PV_SUNTECH_720" ? q * 720 : 0), 0) * 5.5 / 1000;
-const RES_MAX = Math.max(...PRESETS.filter((p) => p.type !== "com").map(dailyProduction));
-export const presetForDaily = (n: number): Preset => {
-  const res = PRESETS.filter((p) => p.type !== "com");
-  if (n <= RES_MAX) {
-    // resNearest: closest production; 8/12 kW systems never below the need.
-    const ok = res.filter((p) => !/^إنفرتر (8|12) /.test(p.group) || dailyProduction(p) >= n);
-    return ok.reduce((b, p) => (Math.abs(dailyProduction(p) - n) < Math.abs(dailyProduction(b) - n) ? p : b));
-  }
-  // Commercial: smallest system whose production covers the need.
-  const com = PRESETS.filter((p) => p.type === "com").sort((a, b) => dailyProduction(a) - dailyProduction(b));
-  return com.find((p) => dailyProduction(p) >= n) ?? com[com.length - 1]!;
+// ===== Exact copy of the WhatsApp bot selection rules (State Machine) =====
+// Residential: bot RES_TABLE "range" values (Excel), in the same order as the residential presets.
+// Preset #6 (6.2 kW, 4 panels) is bot r6 AND r7 (identical systems), so it carries both ranges.
+const RES_RANGES: number[][] = [[1.2], [2.5], [2.5], [4], [4], [5, 7.5], [13], [21], [31.7], [35.6], [55.4], [63.4], [71.3], [83.2], [106.9]];
+const RES_LIST = PRESETS.filter((p) => p.type !== "com");
+export const RES_MAX_DAILY = 106.9;
+export const DEFAULT_KWH_PRICE = 290;
+const E = 0.0001;
+// resNearest: closest range; 8/12 kW never below the need; equal distances are all returned (bot tie buttons).
+export const resOptions = (need: number): Preset[] => {
+  let best: number | null = null;
+  let out: Preset[] = [];
+  RES_LIST.forEach((p, i) => {
+    for (const range of RES_RANGES[i] ?? []) {
+      if (/^إنفرتر (8|12) /.test(p.group) && range < need - E) continue;
+      const d = Math.abs(range - need);
+      if (best === null || d < best - E) { best = d; out = [p]; }
+      else if (Math.abs(d - best) <= E && !out.includes(p)) out.push(p);
+    }
+  });
+  return out;
 };
-// Bot entry paths. Residential: monthly bill (YER) → daily need = bill ÷ KWH_PRICE ÷ 30 → resNearest.
-// Commercial (com_1 bill / com_2 kWh per month / com_3 diesel litres) → kWh/month → ÷30 → smallest covering.
-export const KWH_PRICE = 250;
-export const presetForResBill = (bill: number) => presetForDaily(bill / KWH_PRICE / 30);
+// Commercial: comInvOptions (inverter sizes whose max output covers the need; small 8–20 kW first, else big)
+// then comLookup per size/phase: smallest system whose daily output >= need.
+const COM_LIST = PRESETS.filter((p) => p.type === "com");
+const kwOf = (p: Preset) => Number((p.group.match(/(\d+(?:\.\d+)?) كيلو/) ?? [])[1] ?? 0);
+const COM_SMALL = [8, 12, 16, 20];
+export const comOptions = (need: number): Preset[] => {
+  const maxDaily = (kw: number) => Math.max(0, ...COM_LIST.filter((p) => kwOf(p) === kw).map(dailyProduction));
+  const kws = [...new Set(COM_LIST.map(kwOf))];
+  const small = kws.filter((k) => COM_SMALL.includes(k));
+  const big = kws.filter((k) => !COM_SMALL.includes(k));
+  const smallMax = Math.max(0, ...small.map(maxDaily));
+  let use = need <= smallMax && small.length ? small : big;
+  if (!use.length) use = small;
+  use = use.filter((k) => maxDaily(k) >= need - E).sort((a, b) => a - b);
+  const out: Preset[] = [];
+  for (const kw of use) {
+    const groups = [...new Set(COM_LIST.filter((p) => kwOf(p) === kw).map((p) => p.group))];
+    for (const g of groups) {
+      const pick = COM_LIST.filter((p) => p.group === g).sort((a, b) => dailyProduction(a) - dailyProduction(b)).find((p) => dailyProduction(p) >= need - E);
+      if (pick) out.push(pick);
+    }
+  }
+  return out;
+};
+// Bot entry paths. Residential bill → need = bill ÷ price ÷ 30; above the largest home range → commercial.
+export const optionsForResBill = (bill: number, price = DEFAULT_KWH_PRICE): Preset[] => {
+  const need = bill / price / 30;
+  return need > RES_MAX_DAILY + E ? comOptions(need) : resOptions(need);
+};
 export type ComMethod = "bill" | "kwh" | "diesel";
-export const presetForCom = (m: ComMethod, v: number): Preset => {
-  const kwh = m === "bill" ? v / KWH_PRICE : m === "kwh" ? v : v / 0.27;
-  const need = kwh / 30;
-  const com = PRESETS.filter((p) => p.type === "com").sort((a, b) => dailyProduction(a) - dailyProduction(b));
-  // Small commercial need (below the smallest commercial system) is treated exactly as residential.
-  if (need < dailyProduction(com[0]!) - 0.0001) return presetForDaily(need);
-  return com.find((p) => dailyProduction(p) >= need - 0.0001) ?? com[com.length - 1]!;
+// Commercial (com_1 bill / com_2 kWh per month / com_3 diesel litres ÷ 0.27) → kWh/month ÷ 30.
+export const optionsForCom = (m: ComMethod, v: number, price = DEFAULT_KWH_PRICE): Preset[] => {
+  const kwh = m === "bill" ? v / price : m === "kwh" ? v : v / 0.27;
+  return comOptions(kwh / 30);
 };
 
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
