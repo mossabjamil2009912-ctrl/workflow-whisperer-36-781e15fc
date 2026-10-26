@@ -20,12 +20,15 @@ describe("residential bill — bot resNearest on Excel ranges", () => {
 });
 
 describe("commercial — bot comInvOptions + comLookup", () => {
-  it("150 kWh/month (5/day) → bot gives smallest commercial, 8 kW 8 panels first", () => {
-    const o = optionsForCom("kwh", 150);
-    expect(o.every((p) => p.type === "com")).toBe(true);
-    expect(dailyProduction(o[0]!)).toBeCloseTo(31.68);
+  it("150 kWh/month (5/day) fits home range → treated as residential (6.2 kW 4 panels)", () => {
+    expect(titles(optionsForCom("kwh", 150))).toEqual(titles(optionsForResBill(150 * 290)));
+  });
+  it("above 106.9/day → commercial, smallest covering", () => {
+    const o = optionsForCom("kwh", 3300);
+    expect(o.length).toBeGreaterThan(0);
+    expect(o.every((p) => p.type === "com" && dailyProduction(p) >= 110)).toBe(true);
   });
   it("bill uses the kWh price: 43,500 at 290 = 150 kWh", () => expect(titles(optionsForCom("bill", 43500))).toEqual(titles(optionsForCom("kwh", 150))));
   it("diesel litres ÷ 0.27", () => expect(titles(optionsForCom("diesel", 270))).toEqual(titles(optionsForCom("kwh", 1000))));
-  it("every option covers the need", () => { for (const p of optionsForCom("kwh", 3000)) expect(dailyProduction(p)).toBeGreaterThanOrEqual(100); });
+  it("every option covers the need", () => { for (const p of optionsForCom("kwh", 3300)) expect(dailyProduction(p)).toBeGreaterThanOrEqual(110); });
 });
