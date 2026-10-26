@@ -36,7 +36,7 @@ const specRow = (s: string) => {
 
 type Preset = { type?: "res" | "com"; group: string; title: string; items: [string, number][]; lines?: Line[]; panels?: number; pw?: number };
 // All ready-made systems come verbatim from the bot (names, specs, quantities, prices) — see bot-presets.ts.
-const PRESETS: Preset[] = BOT_PRESETS.map((p) => ({ ...p }));
+export const PRESETS: Preset[] = BOT_PRESETS.map((p) => ({ ...p }));
 
 // Links each bot line to its catalog item so ready-made systems always use live catalog prices.
 export const catalogKeyFor = (l: { name: string; price: number; specs: string[] }): string | null => {
