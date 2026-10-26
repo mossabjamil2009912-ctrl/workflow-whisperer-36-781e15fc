@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Search, FilePlus2, Save, Minus, Plus, Trash2, Check, Zap, Battery, Sun, Box, ShieldCheck, Server, Home, Cpu, Cable, Wrench, Printer, History, Share2, X, Download } from "lucide-react";
-import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment, ensureCustomerByPhone, uploadQuotePdf } from "@/lib/crm.functions";
+import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment, ensureCustomerByPhone, uploadQuotePdf, getKwhPrice, setKwhPrice } from "@/lib/crm.functions";
 import { BOT_PRESETS } from "@/lib/bot-presets";
 import logoClean from "@/assets/actes-logo-clean.png";
 
@@ -98,30 +98,62 @@ PRESETS.push(...COMMERCIAL);
 // production = panels × panel W × 5.5 / 1000.
 export const dailyProduction = (p: Preset) => p.panels ? p.panels * (p.pw ?? 720) * 5.5 / 1000 :
   p.items.reduce((s, [k, q]) => s + (k === "PV_SUNTECH_595" ? q * 595 : k === "PV_SUNTECH_720" ? q * 720 : 0), 0) * 5.5 / 1000;
-const RES_MAX = Math.max(...PRESETS.filter((p) => p.type !== "com").map(dailyProduction));
-export const presetForDaily = (n: number): Preset => {
-  const res = PRESETS.filter((p) => p.type !== "com");
-  if (n <= RES_MAX) {
-    // resNearest: closest production; 8/12 kW systems never below the need.
-    const ok = res.filter((p) => !/^إنفرتر (8|12) /.test(p.group) || dailyProduction(p) >= n);
-    return ok.reduce((b, p) => (Math.abs(dailyProduction(p) - n) < Math.abs(dailyProduction(b) - n) ? p : b));
-  }
-  // Commercial: smallest system whose production covers the need.
-  const com = PRESETS.filter((p) => p.type === "com").sort((a, b) => dailyProduction(a) - dailyProduction(b));
-  return com.find((p) => dailyProduction(p) >= n) ?? com[com.length - 1]!;
+// ===== Exact copy of the WhatsApp bot selection rules (State Machine) =====
+// Residential: bot RES_TABLE "range" values (Excel), in the same order as the residential presets.
+// Preset #6 (6.2 kW, 4 panels) is bot r6 AND r7 (identical systems), so it carries both ranges.
+const RES_RANGES: number[][] = [[1.2], [2.5], [2.5], [4], [4], [5, 7.5], [13], [21], [31.7], [35.6], [55.4], [63.4], [71.3], [83.2], [106.9]];
+const RES_LIST = PRESETS.filter((p) => p.type !== "com");
+export const RES_MAX_DAILY = 106.9;
+export const DEFAULT_KWH_PRICE = 290;
+const E = 0.0001;
+// resNearest: closest range; 8/12 kW never below the need; equal distances are all returned (bot tie buttons).
+export const resOptions = (need: number): Preset[] => {
+  let best: number | null = null;
+  let out: Preset[] = [];
+  RES_LIST.forEach((p, i) => {
+    for (const range of RES_RANGES[i] ?? []) {
+      if (/^إنفرتر (8|12) /.test(p.group) && range < need - E) continue;
+      const d = Math.abs(range - need);
+      if (best === null || d < best - E) { best = d; out = [p]; }
+      else if (Math.abs(d - best) <= E && !out.includes(p)) out.push(p);
+    }
+  });
+  return out;
 };
-// Bot entry paths. Residential: monthly bill (YER) → daily need = bill ÷ KWH_PRICE ÷ 30 → resNearest.
-// Commercial (com_1 bill / com_2 kWh per month / com_3 diesel litres) → kWh/month → ÷30 → smallest covering.
-export const KWH_PRICE = 250;
-export const presetForResBill = (bill: number) => presetForDaily(bill / KWH_PRICE / 30);
+// Commercial: comInvOptions (inverter sizes whose max output covers the need; small 8–20 kW first, else big)
+// then comLookup per size/phase: smallest system whose daily output >= need.
+const COM_LIST = PRESETS.filter((p) => p.type === "com");
+const kwOf = (p: Preset) => Number((p.group.match(/(\d+(?:\.\d+)?) كيلو/) ?? [])[1] ?? 0);
+const COM_SMALL = [8, 12, 16, 20];
+export const comOptions = (need: number): Preset[] => {
+  const maxDaily = (kw: number) => Math.max(0, ...COM_LIST.filter((p) => kwOf(p) === kw).map(dailyProduction));
+  const kws = [...new Set(COM_LIST.map(kwOf))];
+  const small = kws.filter((k) => COM_SMALL.includes(k));
+  const big = kws.filter((k) => !COM_SMALL.includes(k));
+  const smallMax = Math.max(0, ...small.map(maxDaily));
+  let use = need <= smallMax && small.length ? small : big;
+  if (!use.length) use = small;
+  use = use.filter((k) => maxDaily(k) >= need - E).sort((a, b) => a - b);
+  const out: Preset[] = [];
+  for (const kw of use) {
+    const groups = [...new Set(COM_LIST.filter((p) => kwOf(p) === kw).map((p) => p.group))];
+    for (const g of groups) {
+      const pick = COM_LIST.filter((p) => p.group === g).sort((a, b) => dailyProduction(a) - dailyProduction(b)).find((p) => dailyProduction(p) >= need - E);
+      if (pick) out.push(pick);
+    }
+  }
+  return out;
+};
+// Bot entry paths. Residential bill → need = bill ÷ price ÷ 30; above the largest home range → commercial.
+export const optionsForResBill = (bill: number, price = DEFAULT_KWH_PRICE): Preset[] => {
+  const need = bill / price / 30;
+  return need > RES_MAX_DAILY + E ? comOptions(need) : resOptions(need);
+};
 export type ComMethod = "bill" | "kwh" | "diesel";
-export const presetForCom = (m: ComMethod, v: number): Preset => {
-  const kwh = m === "bill" ? v / KWH_PRICE : m === "kwh" ? v : v / 0.27;
-  const need = kwh / 30;
-  const com = PRESETS.filter((p) => p.type === "com").sort((a, b) => dailyProduction(a) - dailyProduction(b));
-  // Small commercial need (below the smallest commercial system) is treated exactly as residential.
-  if (need < dailyProduction(com[0]!) - 0.0001) return presetForDaily(need);
-  return com.find((p) => dailyProduction(p) >= need - 0.0001) ?? com[com.length - 1]!;
+// Commercial (com_1 bill / com_2 kWh per month / com_3 diesel litres ÷ 0.27) → kWh/month ÷ 30.
+export const optionsForCom = (m: ComMethod, v: number, price = DEFAULT_KWH_PRICE): Preset[] => {
+  const kwh = m === "bill" ? v / price : m === "kwh" ? v : v / 0.27;
+  return comOptions(kwh / 30);
 };
 
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
@@ -286,6 +318,18 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   const [daily, setDaily] = useState("");
   const [path, setPath] = useState<"res" | "com" | null>(null);
   const [comM, setComM] = useState<ComMethod | null>(null);
+  const [opts, setOpts] = useState<Preset[]>([]);
+  const getKwh = useServerFn(getKwhPrice);
+  const saveKwh = useServerFn(setKwhPrice);
+  const { data: kwhData, refetch: refetchKwh } = useQuery({ queryKey: ["kwh_price"], queryFn: () => getKwh({ data: { pw } }) });
+  const kwhPrice = kwhData?.kwh_price ?? DEFAULT_KWH_PRICE;
+  const [kwhEdit, setKwhEdit] = useState<string | null>(null);
+  const saveKwhPrice = async () => {
+    const v = Number(kwhEdit);
+    if (!(v > 0)) return setMsg("سعر غير صحيح");
+    try { await saveKwh({ data: { pw, price: v } }); await refetchKwh(); setKwhEdit(null); setMsg(`تم حفظ سعر الكيلووات: ${v} ريال (البوت والتطبيق)`); }
+    catch (e) { setMsg((e as Error).message); }
+  };
   const [share, setShare] = useState(false);
   const [shareQ, setShareQ] = useState("");
 
@@ -441,20 +485,36 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           <h2 className="flex items-center gap-2 text-lg font-bold"><FilePlus2 className="h-5 w-5 text-primary" />إنشاء عرض سعر</h2>
           <div className="mr-auto flex flex-wrap items-center gap-1">
             {(["res", "com"] as const).map((k) => (
-              <button key={k} type="button" onClick={() => { setPath(path === k ? null : k); setComM(null); setDaily(""); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${path === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{k === "res" ? "سكني" : "تجاري"}</button>
+              <button key={k} type="button" onClick={() => { setPath(path === k ? null : k); setComM(null); setOpts([]); setDaily(""); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${path === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{k === "res" ? "سكني" : "تجاري"}</button>
             ))}
             {path === "com" && (["bill", "kwh", "diesel"] as const).map((m) => (
               <button key={m} type="button" onClick={() => { setComM(m); setDaily(""); }} className={`rounded-lg border px-2 py-1.5 text-xs font-semibold ${comM === m ? "border-primary bg-primary/10 text-primary" : "bg-card"}`}>{m === "bill" ? "فاتورة" : m === "kwh" ? "استهلاك شهري" : "الديزل"}</button>
             ))}
             {(path === "res" || (path === "com" && comM)) && (
-              <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (!(n > 0)) return; loadPreset(path === "res" ? presetForResBill(n) : presetForCom(comM!, n)); }} className="flex items-center gap-1">
+              <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (!(n > 0)) return; const o = path === "res" ? optionsForResBill(n, kwhPrice) : optionsForCom(comM!, n, kwhPrice); if (!o.length) { setOpts([]); return setMsg("لا توجد منظومة مناسبة — يُحوّل للموظف المختص"); } if (o.length === 1) { setOpts([]); loadPreset(o[0]!); } else setOpts(o); }} className="flex items-center gap-1">
                 <input autoFocus value={daily} onChange={(e) => setDaily(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder={path === "res" || comM === "bill" ? "الفاتورة الشهرية (ريال)" : comM === "kwh" ? "الاستهلاك الشهري (كيلووات)" : "الديزل الشهري (لتر)"} className="w-40 rounded-lg border bg-card px-2 py-1.5 text-xs" />
                 <button type="submit" className="rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground">عرض</button>
               </form>
             )}
           </div>
+          <div className="flex items-center gap-1 text-xs">
+            <span className="text-muted-foreground">سعر الكيلووات:</span>
+            {kwhEdit === null
+              ? <button type="button" onClick={() => setKwhEdit(String(kwhPrice))} className="rounded-lg border bg-card px-2 py-1 font-bold">{kwhPrice} ريال</button>
+              : <><input autoFocus value={kwhEdit} onChange={(e) => setKwhEdit(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" className="w-16 rounded-lg border bg-card px-2 py-1" />
+                <button type="button" onClick={saveKwhPrice} className="rounded-lg bg-primary px-2 py-1 font-bold text-primary-foreground">حفظ</button>
+                <button type="button" onClick={() => setKwhEdit(null)} className="rounded-lg bg-muted px-2 py-1">إلغاء</button></>}
+          </div>
           <button onClick={() => setShowHist((v) => !v)} className="flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض الجاهزة ({PRESETS.length})</button>
         </div>
+        {opts.length > 1 && (
+          <div className="rounded-xl border bg-muted/30 p-2">
+            <div className="mb-1 text-xs font-bold">منظومات مناسبة لاستهلاكك — اختر واحدة (مثل البوت):</div>
+            <div className="grid gap-1 sm:grid-cols-2">
+              {opts.map((p) => <button key={p.title} type="button" onClick={() => { setOpts([]); loadPreset(p); }} className="rounded-lg border bg-card px-2 py-1.5 text-right text-xs font-semibold hover:bg-muted">{p.title}</button>)}
+            </div>
+          </div>
+        )}
         {showHist && (
           <div className="max-h-96 overflow-y-auto rounded-xl border bg-muted/30 p-2 animate-in fade-in slide-in-from-top-2">
             <div className="mb-2 grid grid-cols-2 gap-1">

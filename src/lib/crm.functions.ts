@@ -443,3 +443,23 @@ export const sendReportRequest = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+// kWh price (YER) shared by the app quotes and the WhatsApp bot (served via /api/public/bot-catalog).
+export const getKwhPrice = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ pw: z.string() }).parse(d))
+  .handler(async ({ data }) => {
+    check(data.pw);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: r } = await supabaseAdmin.from("app_settings").select("value").eq("key", "kwh_price").maybeSingle();
+    return { kwh_price: r ? Number(r.value) : 290 };
+  });
+
+export const setKwhPrice = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ pw: z.string(), price: z.number().positive().max(100000) }).parse(d))
+  .handler(async ({ data }) => {
+    check(data.pw);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("app_settings").upsert({ key: "kwh_price", value: data.price, updated_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+    return { kwh_price: data.price };
+  });
