@@ -32,3 +32,4 @@ describe("commercial — bot comInvOptions + comLookup", () => {
   it("diesel litres ÷ 0.27", () => expect(titles(optionsForCom("diesel", 270))).toEqual(titles(optionsForCom("kwh", 1000))));
   it("every option covers the need", () => { for (const p of optionsForCom("kwh", 3300)) expect(dailyProduction(p)).toBeGreaterThanOrEqual(110); });
 });
+

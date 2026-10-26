@@ -337,7 +337,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   const [daily, setDaily] = useState("");
   const [path, setPath] = useState<"res" | "com" | null>(null);
   const [comM, setComM] = useState<ComMethod | null>(null);
-  const [opts, setOpts] = useState<Preset[]>([]);
+  const [tiers, setTiers] = useState<Tiers | null>(null);
   const getKwh = useServerFn(getKwhPrice);
   const saveKwh = useServerFn(setKwhPrice);
   const { data: kwhData, refetch: refetchKwh } = useQuery({ queryKey: ["kwh_price"], queryFn: () => getKwh({ data: { pw } }) });
