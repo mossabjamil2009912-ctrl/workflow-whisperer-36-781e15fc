@@ -17,6 +17,14 @@ For business values the right-system step returns several systems at once (one p
 3. Check a few values on screen (e.g. monthly 4,000 / 10,000 / 20,000 kWh) and show you the three picks.
 4. Update the bot's matching rule in n8n the same way.
 
+## Also: pick inverter size and single/three phase for business (like the bot)
+- For business values that need a large system, after entering the value the app shows the inverter sizes that can cover the need (same list the bot shows), e.g. 30 / 40 / 50 kW.
+- After picking a size, if that size comes in both single phase and three phase, the app asks "سنجل أو ثري"; if only one exists it is chosen automatically.
+- Then the three choices (less / recommended / more) appear for that size and phase.
+- Small business values that fall in the home range keep going straight to the three choices, as today.
+- Add tests: the size list matches the bot's list for sample values; the phase question only appears when both exist.
+- Add this task to the roadmap.
+
 ## Technical details
 - `QuoteBuilder.tsx` `tiersFrom`: use `idx = SIZE_ORDER.indexOf(opts[0])` instead of min/max over all `opts`; search within same `group` sorted by `dailyProduction` first, then global `SIZE_ORDER`; skip equal production.
 - Tie case (home): keep "rec" = first tied system; low/high skip the other tied systems.
