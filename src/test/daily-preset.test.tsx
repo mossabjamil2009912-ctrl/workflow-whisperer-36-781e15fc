@@ -1,43 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { presetForDaily, dailyProduction } from "@/components/QuoteBuilder";
+import { optionsForResBill, optionsForCom, dailyProduction, DEFAULT_KWH_PRICE } from "@/components/QuoteBuilder";
 
-const t = (n: number) => presetForDaily(n).title;
-const prod = (n: number) => dailyProduction(presetForDaily(n));
+const titles = (ps: { title: string }[]) => ps.map((p) => p.title);
 
-describe("presetForDaily — bot formulas with daily kWh input", () => {
-  it("production = panels × W × 5.5 / 1000 (4×720 → 15.84)", () => expect(prod(16)).toBeCloseTo(15.84));
-  it("3 kWh → nearest 1.6 system (3.27)", () => expect(prod(3)).toBeCloseTo(3.2725));
-  it("20 kWh → 6.2 with 5 panels (19.8)", () => expect(t(20)).toContain("5 ألواح"));
-  it("30 kWh → 8k never below need (31.68)", () => expect(prod(30)).toBeCloseTo(31.68));
-  it("100 kWh → 12k 27 panels", () => expect(t(100)).toContain("27 لوح"));
-  it("above residential max goes commercial, smallest covering", () => {
-    expect(presetForDaily(120).type).toBe("com");
-    expect(prod(120)).toBeCloseTo(130.68);
-  });
-  it("300 kWh → commercial covering ≥ 300 (594)", () => expect(prod(300)).toBeCloseTo(594));
+describe("kWh price", () => {
+  it("default is 290 YER", () => expect(DEFAULT_KWH_PRICE).toBe(290));
 });
 
-import { presetForCom, presetForResBill } from "@/components/QuoteBuilder";
-describe("bot entry paths", () => {
-  it("commercial 1000 kWh/month (33.3/day) → smallest commercial covering", () => expect(presetForCom("kwh", 1000).type).toBe("com"));
-  it("commercial diesel 100 L (12.3/day) is small → treated as residential", () => expect(presetForCom("diesel", 100).type).toBe("res"));
-  it("residential bill 8700 YER → need 1/day → 1.6 system", () => expect(dailyProduction(presetForResBill(8700))).toBeCloseTo(3.2725));
-  it("kWh price is 250 YER like the bot: 7500 YER/month → need 1/day → 1.6 system", () => expect(dailyProduction(presetForResBill(7500))).toBeCloseTo(3.2725));
-  it("commercial bill 37500 YER/month → 5/day → same as residential", () => expect(presetForCom("bill", 37500)).toBe(presetForDaily(5)));
+describe("residential bill — bot resNearest on Excel ranges", () => {
+  it("50,000 at 290 → need 5.75 → 6.2 kW 4 panels (range 5)", () => expect(titles(optionsForResBill(50000))).toEqual(["6.2 كيلو — بطارية 5.12 كيلو — 4 ألواح 720W"]));
+  it("50,000 at 250 → need 6.67 → same 6.2 kW 4 panels (range 7.5)", () => expect(titles(optionsForResBill(50000, 250))).toEqual(["6.2 كيلو — بطارية 5.12 كيلو — 4 ألواح 720W"]));
+  it("price changes the result: 100,000 at 290 → 13 range, at 250 → 13 range vs 150,000", () => {
+    expect(titles(optionsForResBill(150000, 290))[0]).toContain("5 ألواح"); // 17.2 → 13
+    expect(titles(optionsForResBill(150000, 250))[0]).toContain("6 ألواح"); // 20 → 21
+  });
+  it("tie returns both systems (range 2.5): 21,750 at 290 → 2.5", () => expect(optionsForResBill(21750)).toHaveLength(2));
+  it("8 kW never below need: 32 kWh/day → 8 kW 9 panels (35.6)", () => expect(titles(optionsForResBill(32 * 30 * 290))[0]).toContain("9 ألواح"));
+  it("above 106.9 → commercial", () => expect(optionsForResBill(110 * 30 * 290).every((p) => p.type === "com")).toBe(true));
 });
 
-import { presetForCom as pc2, presetForDaily as pd2 } from "@/components/QuoteBuilder";
-import { describe as d2, it as i2, expect as e2 } from "vitest";
-d2("small commercial treated as residential", () => {
-  i2("100 kWh/month commercial → same as residential daily 3.33", () => {
-    const p = pc2("kwh", 100);
-    e2(p.type).not.toBe("com");
-    e2(p).toBe(pd2(100 / 30));
+describe("commercial — bot comInvOptions + comLookup", () => {
+  it("150 kWh/month (5/day) → bot gives smallest commercial, 8 kW 8 panels first", () => {
+    const o = optionsForCom("kwh", 150);
+    expect(o.every((p) => p.type === "com")).toBe(true);
+    expect(dailyProduction(o[0]!)).toBeCloseTo(31.68);
   });
-  i2("150 kWh/month (5/day) commercial → residential system, not 8 kW commercial", () => {
-    e2(pc2("kwh", 150).type).not.toBe("com");
-  });
-  i2("1500 kWh/month (50/day) stays commercial", () => {
-    e2(pc2("kwh", 1500).type).toBe("com");
-  });
+  it("bill uses the kWh price: 43,500 at 290 = 150 kWh", () => expect(titles(optionsForCom("bill", 43500))).toEqual(titles(optionsForCom("kwh", 150))));
+  it("diesel litres ÷ 0.27", () => expect(titles(optionsForCom("diesel", 270))).toEqual(titles(optionsForCom("kwh", 1000))));
+  it("every option covers the need", () => { for (const p of optionsForCom("kwh", 3000)) expect(dailyProduction(p)).toBeGreaterThanOrEqual(100); });
 });

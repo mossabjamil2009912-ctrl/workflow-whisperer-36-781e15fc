@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Search, FilePlus2, Save, Minus, Plus, Trash2, Check, Zap, Battery, Sun, Box, ShieldCheck, Server, Home, Cpu, Cable, Wrench, Printer, History, Share2, X, Download } from "lucide-react";
-import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment, ensureCustomerByPhone, uploadQuotePdf } from "@/lib/crm.functions";
+import { listCatalog, listCustomers, saveQuote, listQuotes, sendAttachment, ensureCustomerByPhone, uploadQuotePdf, getKwhPrice, setKwhPrice } from "@/lib/crm.functions";
 import { BOT_PRESETS } from "@/lib/bot-presets";
 import logoClean from "@/assets/actes-logo-clean.png";
 
@@ -318,6 +318,18 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   const [daily, setDaily] = useState("");
   const [path, setPath] = useState<"res" | "com" | null>(null);
   const [comM, setComM] = useState<ComMethod | null>(null);
+  const [opts, setOpts] = useState<Preset[]>([]);
+  const getKwh = useServerFn(getKwhPrice);
+  const saveKwh = useServerFn(setKwhPrice);
+  const { data: kwhData, refetch: refetchKwh } = useQuery({ queryKey: ["kwh_price"], queryFn: () => getKwh({ data: { pw } }) });
+  const kwhPrice = kwhData?.kwh_price ?? DEFAULT_KWH_PRICE;
+  const [kwhEdit, setKwhEdit] = useState<string | null>(null);
+  const saveKwhPrice = async () => {
+    const v = Number(kwhEdit);
+    if (!(v > 0)) return setMsg("سعر غير صحيح");
+    try { await saveKwh({ data: { pw, price: v } }); await refetchKwh(); setKwhEdit(null); setMsg(`تم حفظ سعر الكيلووات: ${v} ريال (البوت والتطبيق)`); }
+    catch (e) { setMsg((e as Error).message); }
+  };
   const [share, setShare] = useState(false);
   const [shareQ, setShareQ] = useState("");
 
@@ -473,20 +485,36 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           <h2 className="flex items-center gap-2 text-lg font-bold"><FilePlus2 className="h-5 w-5 text-primary" />إنشاء عرض سعر</h2>
           <div className="mr-auto flex flex-wrap items-center gap-1">
             {(["res", "com"] as const).map((k) => (
-              <button key={k} type="button" onClick={() => { setPath(path === k ? null : k); setComM(null); setDaily(""); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${path === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{k === "res" ? "سكني" : "تجاري"}</button>
+              <button key={k} type="button" onClick={() => { setPath(path === k ? null : k); setComM(null); setOpts([]); setDaily(""); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${path === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{k === "res" ? "سكني" : "تجاري"}</button>
             ))}
             {path === "com" && (["bill", "kwh", "diesel"] as const).map((m) => (
               <button key={m} type="button" onClick={() => { setComM(m); setDaily(""); }} className={`rounded-lg border px-2 py-1.5 text-xs font-semibold ${comM === m ? "border-primary bg-primary/10 text-primary" : "bg-card"}`}>{m === "bill" ? "فاتورة" : m === "kwh" ? "استهلاك شهري" : "الديزل"}</button>
             ))}
             {(path === "res" || (path === "com" && comM)) && (
-              <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (!(n > 0)) return; loadPreset(path === "res" ? presetForResBill(n) : presetForCom(comM!, n)); }} className="flex items-center gap-1">
+              <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (!(n > 0)) return; const o = path === "res" ? optionsForResBill(n, kwhPrice) : optionsForCom(comM!, n, kwhPrice); if (!o.length) { setOpts([]); return setMsg("لا توجد منظومة مناسبة — يُحوّل للموظف المختص"); } if (o.length === 1) { setOpts([]); loadPreset(o[0]!); } else setOpts(o); }} className="flex items-center gap-1">
                 <input autoFocus value={daily} onChange={(e) => setDaily(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder={path === "res" || comM === "bill" ? "الفاتورة الشهرية (ريال)" : comM === "kwh" ? "الاستهلاك الشهري (كيلووات)" : "الديزل الشهري (لتر)"} className="w-40 rounded-lg border bg-card px-2 py-1.5 text-xs" />
                 <button type="submit" className="rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground">عرض</button>
               </form>
             )}
           </div>
+          <div className="flex items-center gap-1 text-xs">
+            <span className="text-muted-foreground">سعر الكيلووات:</span>
+            {kwhEdit === null
+              ? <button type="button" onClick={() => setKwhEdit(String(kwhPrice))} className="rounded-lg border bg-card px-2 py-1 font-bold">{kwhPrice} ريال</button>
+              : <><input autoFocus value={kwhEdit} onChange={(e) => setKwhEdit(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" className="w-16 rounded-lg border bg-card px-2 py-1" />
+                <button type="button" onClick={saveKwhPrice} className="rounded-lg bg-primary px-2 py-1 font-bold text-primary-foreground">حفظ</button>
+                <button type="button" onClick={() => setKwhEdit(null)} className="rounded-lg bg-muted px-2 py-1">إلغاء</button></>}
+          </div>
           <button onClick={() => setShowHist((v) => !v)} className="flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض الجاهزة ({PRESETS.length})</button>
         </div>
+        {opts.length > 1 && (
+          <div className="rounded-xl border bg-muted/30 p-2">
+            <div className="mb-1 text-xs font-bold">منظومات مناسبة لاستهلاكك — اختر واحدة (مثل البوت):</div>
+            <div className="grid gap-1 sm:grid-cols-2">
+              {opts.map((p) => <button key={p.title} type="button" onClick={() => { setOpts([]); loadPreset(p); }} className="rounded-lg border bg-card px-2 py-1.5 text-right text-xs font-semibold hover:bg-muted">{p.title}</button>)}
+            </div>
+          </div>
+        )}
         {showHist && (
           <div className="max-h-96 overflow-y-auto rounded-xl border bg-muted/30 p-2 animate-in fade-in slide-in-from-top-2">
             <div className="mb-2 grid grid-cols-2 gap-1">
