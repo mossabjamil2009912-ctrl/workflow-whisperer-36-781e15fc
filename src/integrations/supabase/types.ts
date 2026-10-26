@@ -228,6 +228,30 @@ export type Database = {
           },
         ]
       }
+      preset_reports: {
+        Row: {
+          file_name: string
+          kind: string
+          path: string
+          preset_title: string
+          updated_at: string
+        }
+        Insert: {
+          file_name: string
+          kind: string
+          path: string
+          preset_title: string
+          updated_at?: string
+        }
+        Update: {
+          file_name?: string
+          kind?: string
+          path?: string
+          preset_title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       quotes: {
         Row: {
           city: string | null
@@ -268,6 +292,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "quotes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_requests: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          id: string
+          kind: string
+          name: string | null
+          phone: string
+          sent_at: string | null
+          status: string
+          system_label: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          kind?: string
+          name?: string | null
+          phone: string
+          sent_at?: string | null
+          status?: string
+          system_label?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          kind?: string
+          name?: string | null
+          phone?: string
+          sent_at?: string | null
+          status?: string
+          system_label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_requests_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"

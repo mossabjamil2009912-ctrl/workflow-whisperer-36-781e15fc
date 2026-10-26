@@ -18,6 +18,7 @@ import { Route as ApiPublicBotMessageRouteImport } from './routes/api/public/bot
 import { Route as ApiPublicBotOrderRouteImport } from './routes/api/public/bot-order'
 import { Route as ApiPublicBotOrderStatusRouteImport } from './routes/api/public/bot-order-status'
 import { Route as ApiPublicBotPausedRouteImport } from './routes/api/public/bot-paused'
+import { Route as ApiPublicBotReportRequestRouteImport } from './routes/api/public/bot-report-request'
 import { Route as ApiPublicBotTicketRouteImport } from './routes/api/public/bot-ticket'
 import { Route as ApiPublicCrmMediaRouteImport } from './routes/api/public/crm-media'
 
@@ -66,6 +67,12 @@ const ApiPublicBotPausedRoute = ApiPublicBotPausedRouteImport.update({
   path: '/api/public/bot-paused',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBotReportRequestRoute =
+  ApiPublicBotReportRequestRouteImport.update({
+    id: '/api/public/bot-report-request',
+    path: '/api/public/bot-report-request',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicBotTicketRoute = ApiPublicBotTicketRouteImport.update({
   id: '/api/public/bot-ticket',
   path: '/api/public/bot-ticket',
@@ -87,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/api/public/bot-order': typeof ApiPublicBotOrderRoute
   '/api/public/bot-order-status': typeof ApiPublicBotOrderStatusRoute
   '/api/public/bot-paused': typeof ApiPublicBotPausedRoute
+  '/api/public/bot-report-request': typeof ApiPublicBotReportRequestRoute
   '/api/public/bot-ticket': typeof ApiPublicBotTicketRoute
   '/api/public/crm-media': typeof ApiPublicCrmMediaRoute
 }
@@ -100,6 +108,7 @@ export interface FileRoutesByTo {
   '/api/public/bot-order': typeof ApiPublicBotOrderRoute
   '/api/public/bot-order-status': typeof ApiPublicBotOrderStatusRoute
   '/api/public/bot-paused': typeof ApiPublicBotPausedRoute
+  '/api/public/bot-report-request': typeof ApiPublicBotReportRequestRoute
   '/api/public/bot-ticket': typeof ApiPublicBotTicketRoute
   '/api/public/crm-media': typeof ApiPublicCrmMediaRoute
 }
@@ -114,6 +123,7 @@ export interface FileRoutesById {
   '/api/public/bot-order': typeof ApiPublicBotOrderRoute
   '/api/public/bot-order-status': typeof ApiPublicBotOrderStatusRoute
   '/api/public/bot-paused': typeof ApiPublicBotPausedRoute
+  '/api/public/bot-report-request': typeof ApiPublicBotReportRequestRoute
   '/api/public/bot-ticket': typeof ApiPublicBotTicketRoute
   '/api/public/crm-media': typeof ApiPublicCrmMediaRoute
 }
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/api/public/bot-order'
     | '/api/public/bot-order-status'
     | '/api/public/bot-paused'
+    | '/api/public/bot-report-request'
     | '/api/public/bot-ticket'
     | '/api/public/crm-media'
   fileRoutesByTo: FileRoutesByTo
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/api/public/bot-order'
     | '/api/public/bot-order-status'
     | '/api/public/bot-paused'
+    | '/api/public/bot-report-request'
     | '/api/public/bot-ticket'
     | '/api/public/crm-media'
   id:
@@ -155,6 +167,7 @@ export interface FileRouteTypes {
     | '/api/public/bot-order'
     | '/api/public/bot-order-status'
     | '/api/public/bot-paused'
+    | '/api/public/bot-report-request'
     | '/api/public/bot-ticket'
     | '/api/public/crm-media'
   fileRoutesById: FileRoutesById
@@ -169,6 +182,7 @@ export interface RootRouteChildren {
   ApiPublicBotOrderRoute: typeof ApiPublicBotOrderRoute
   ApiPublicBotOrderStatusRoute: typeof ApiPublicBotOrderStatusRoute
   ApiPublicBotPausedRoute: typeof ApiPublicBotPausedRoute
+  ApiPublicBotReportRequestRoute: typeof ApiPublicBotReportRequestRoute
   ApiPublicBotTicketRoute: typeof ApiPublicBotTicketRoute
   ApiPublicCrmMediaRoute: typeof ApiPublicCrmMediaRoute
 }
@@ -238,6 +252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBotPausedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bot-report-request': {
+      id: '/api/public/bot-report-request'
+      path: '/api/public/bot-report-request'
+      fullPath: '/api/public/bot-report-request'
+      preLoaderRoute: typeof ApiPublicBotReportRequestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/bot-ticket': {
       id: '/api/public/bot-ticket'
       path: '/api/public/bot-ticket'
@@ -265,6 +286,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBotOrderRoute: ApiPublicBotOrderRoute,
   ApiPublicBotOrderStatusRoute: ApiPublicBotOrderStatusRoute,
   ApiPublicBotPausedRoute: ApiPublicBotPausedRoute,
+  ApiPublicBotReportRequestRoute: ApiPublicBotReportRequestRoute,
   ApiPublicBotTicketRoute: ApiPublicBotTicketRoute,
   ApiPublicCrmMediaRoute: ApiPublicCrmMediaRoute,
 }

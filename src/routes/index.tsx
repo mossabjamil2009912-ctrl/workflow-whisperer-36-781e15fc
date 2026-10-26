@@ -33,7 +33,8 @@ import { Orders, useOrders } from "@/components/Orders";
 import { Tickets, useTickets } from "@/components/Tickets";
 import { Catalog } from "@/components/Catalog";
 import { QuoteBuilder } from "@/components/QuoteBuilder";
-import { FilePlus2 } from "lucide-react";
+import { FilePlus2, FileBarChart } from "lucide-react";
+import { Reports, useReports } from "@/components/Reports";
 import logo from "@/assets/actes-logo.png.asset.json";
 import logoClean from "@/assets/actes-logo-clean.png";
 import waBg from "@/assets/actes-wa-bg.png.asset.json";
@@ -174,7 +175,9 @@ function Dashboard({ pw, onLogout }: { pw: string; onLogout: () => void }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Stage | "all">("all");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [view, setView] = useState<"chats" | "orders" | "tickets" | "catalog" | "quote">("chats");
+  const [view, setView] = useState<"chats" | "orders" | "reports" | "tickets" | "catalog" | "quote">("chats");
+  const { data: rep } = useReports(pw);
+  const pendingReports = (rep?.requests ?? []).filter((r) => r.status === "pending").length;
   const { data: tickets = [] } = useTickets(pw);
   const openTickets = tickets.filter((t) => t.status === "open").length;
   const { data: orders = [] } = useOrders(pw);
@@ -234,6 +237,7 @@ function Dashboard({ pw, onLogout }: { pw: string; onLogout: () => void }) {
   const tabs = [
     { k: "chats" as const, l: "المحادثات", i: MessageCircle, n: 0 },
     { k: "orders" as const, l: "الطلبات", i: FileText, n: pending },
+    { k: "reports" as const, l: "التقارير", i: FileBarChart, n: pendingReports },
     { k: "tickets" as const, l: "الدعم الفني", i: Headphones, n: openTickets },
     { k: "catalog" as const, l: "الأصناف", i: LayoutGrid, n: 0 },
     { k: "quote" as const, l: "إنشاء عرض سعر", i: FilePlus2, n: 0 },
@@ -279,6 +283,7 @@ function Dashboard({ pw, onLogout }: { pw: string; onLogout: () => void }) {
       <div className="mx-auto w-full max-w-7xl flex-1 space-y-3 p-3 md:p-4 lg:flex lg:min-h-0 lg:flex-col lg:space-y-2 lg:p-2">
 
         {view === "orders" ? <div className="rounded-xl border border-border bg-card lg:min-h-0 lg:flex-1 lg:overflow-y-auto"><Orders pw={pw} /></div>
+        : view === "reports" ? <div className="rounded-xl border border-border bg-card lg:min-h-0 lg:flex-1 lg:overflow-y-auto"><Reports pw={pw} /></div>
         : view === "tickets" ? <div className="rounded-xl border border-border bg-card lg:min-h-0 lg:flex-1 lg:overflow-y-auto"><Tickets pw={pw} /></div>
         : view === "catalog" ? <div className="rounded-xl border border-border bg-card lg:min-h-0 lg:flex-1 lg:overflow-y-auto"><Catalog pw={pw} /></div>
         : view === "quote" ? <div className="rounded-xl border border-border bg-background lg:min-h-0 lg:flex-1 lg:overflow-hidden"><QuoteBuilder pw={pw} /></div> : <>
