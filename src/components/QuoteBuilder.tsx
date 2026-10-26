@@ -161,7 +161,7 @@ export const optionsForCom = (m: ComMethod, v: number, price = DEFAULT_KWH_PRICE
 // Three choices (app + bot): one size smaller / the right system / one size larger.
 // Size order: home systems as listed, then business systems by daily production.
 const SIZE_ORDER: Preset[] = [...RES_LIST, ...[...COM_LIST].sort((a, b) => dailyProduction(a) - dailyProduction(b))];
-export type Tiers = { low?: Preset; rec: Preset; high?: Preset };
+export type Tiers = { low?: Preset | undefined; rec: Preset; high?: Preset | undefined };
 export const tiersFrom = (opts: Preset[]): Tiers | null => {
   if (!opts.length) return null;
   const idx = opts.map((p) => SIZE_ORDER.indexOf(p)).filter((i) => i >= 0);
