@@ -11,7 +11,7 @@
 - [x] Edit quote items (qty, swap, price, delete) after closing the price card — this copy only
 - [ ] Publish so the bot gets the kWh price from the live app
 - [x] Three choices (less / recommended / more independence) in app and bot home path
-- [ ] Bot: three choices for large business systems (bot still asks inverter size there)
+- [x] Bot: three choices for large business systems
 - [x] Business three choices = the very next size (app)
 - [x] App: pick inverter size + single/three phase for business, like the bot
-- [ ] Bot: same "very next size" rule for the three choices
+- [x] Bot: inverter size → phase → three choices (very next size) for business

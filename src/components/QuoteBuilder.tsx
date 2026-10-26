@@ -169,9 +169,13 @@ export const tiersFrom = (opts: Preset[]): Tiers | null => {
   const rec = opts[0]!;
   const skip = new Set(opts.map(dailyProduction));
   const r = dailyProduction(rec);
-  const fam = PRESETS.filter((p) => p.group === rec.group && !skip.has(dailyProduction(p))).sort((a, b) => dailyProduction(a) - dailyProduction(b));
-  let low = [...fam].reverse().find((p) => dailyProduction(p) < r);
-  let high = fam.find((p) => dailyProduction(p) > r);
+  if (rec.type === "com") {
+    // Business (bot com_tier_ask): only within the chosen inverter size + phase.
+    const fam = PRESETS.filter((p) => p.group === rec.group && !skip.has(dailyProduction(p))).sort((a, b) => dailyProduction(a) - dailyProduction(b));
+    return { low: [...fam].reverse().find((p) => dailyProduction(p) < r), rec, high: fam.find((p) => dailyProduction(p) > r) };
+  }
+  // Home (bot resTiers): neighbours in the size list, starting from the recommended system.
+  let low: Preset | undefined, high: Preset | undefined;
   const i0 = SIZE_ORDER.indexOf(rec);
   if (!low) for (let i = i0 - 1; i >= 0; i--) { const p = SIZE_ORDER[i]!; if (!skip.has(dailyProduction(p)) && dailyProduction(p) < r) { low = p; break; } }
   if (!high) for (let i = i0 + 1; i < SIZE_ORDER.length; i++) { const p = SIZE_ORDER[i]!; if (!skip.has(dailyProduction(p)) && dailyProduction(p) > r) { high = p; break; } }
