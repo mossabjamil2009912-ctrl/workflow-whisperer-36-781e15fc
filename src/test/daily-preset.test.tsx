@@ -10,9 +10,9 @@ describe("kWh price", () => {
 describe("residential bill — bot resNearest on Excel ranges", () => {
   it("50,000 at 290 → need 5.75 → 6.2 kW 4 panels (range 5)", () => expect(titles(optionsForResBill(50000))).toEqual(["6.2 كيلو — بطارية 5.12 كيلو — 4 ألواح 720W"]));
   it("50,000 at 250 → need 6.67 → same 6.2 kW 4 panels (range 7.5)", () => expect(titles(optionsForResBill(50000, 250))).toEqual(["6.2 كيلو — بطارية 5.12 كيلو — 4 ألواح 720W"]));
-  it("price changes the result: 100,000 at 290 → 13 range, at 250 → 13 range vs 150,000", () => {
-    expect(titles(optionsForResBill(150000, 290))[0]).toContain("5 ألواح"); // 17.2 → 13
-    expect(titles(optionsForResBill(150000, 250))[0]).toContain("6 ألواح"); // 20 → 21
+  it("price changes the result: 130,000 at 290 → 14.9 → range 13; at 250 → 17.3 → range 21", () => {
+    expect(titles(optionsForResBill(130000, 290))[0]).toContain("5 ألواح"); 
+    expect(titles(optionsForResBill(130000, 250))[0]).toContain("6 ألواح"); 
   });
   it("tie returns both systems (range 2.5): 21,750 at 290 → 2.5", () => expect(optionsForResBill(21750)).toHaveLength(2));
   it("8 kW never below need: 32 kWh/day → 8 kW 9 panels (35.6)", () => expect(titles(optionsForResBill(32 * 30 * 290))[0]).toContain("9 ألواح"));
