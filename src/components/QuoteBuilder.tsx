@@ -535,13 +535,13 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           <h2 className="flex items-center gap-2 text-lg font-bold"><FilePlus2 className="h-5 w-5 text-primary" />إنشاء عرض سعر</h2>
           <div className="mr-auto flex flex-wrap items-center gap-1">
             {(["res", "com"] as const).map((k) => (
-              <button key={k} type="button" onClick={() => { setPath(path === k ? null : k); setComM(null); setTiers(null); setDaily(""); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${path === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{k === "res" ? "سكني" : "تجاري"}</button>
+              <button key={k} type="button" onClick={() => { setPath(path === k ? null : k); setComM(null); setTiers(null); setInvs(null); setInvKw(null); setDaily(""); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${path === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{k === "res" ? "سكني" : "تجاري"}</button>
             ))}
             {path === "com" && (["bill", "kwh", "diesel"] as const).map((m) => (
               <button key={m} type="button" onClick={() => { setComM(m); setDaily(""); }} className={`rounded-lg border px-2 py-1.5 text-xs font-semibold ${comM === m ? "border-primary bg-primary/10 text-primary" : "bg-card"}`}>{m === "bill" ? "فاتورة" : m === "kwh" ? "استهلاك شهري" : "الديزل"}</button>
             ))}
             {(path === "res" || (path === "com" && comM)) && (
-              <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (!(n > 0)) return; const t = tieredOptions(path!, comM ?? "bill", n, kwhPrice); if (!t) { setTiers(null); return setMsg("لا توجد منظومة مناسبة — يُحوّل للموظف المختص"); } setTiers(t); }} className="flex items-center gap-1">
+              <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (!(n > 0)) return; setInvKw(null); const opts = path === "res" ? optionsForResBill(n, kwhPrice) : optionsForCom(comM ?? "bill", n, kwhPrice); const ic = inverterChoices(opts); if (ic.length > 1 || (ic[0] && ic[0].single && ic[0].three)) { setTiers(null); setInvs(ic); if (ic.length === 1) setInvKw(ic[0]!); return; } setInvs(null); const t = tiersFrom(opts); if (!t) { setTiers(null); return setMsg("لا توجد منظومة مناسبة — يُحوّل للموظف المختص"); } setTiers(t); }} className="flex items-center gap-1">
                 <input autoFocus value={daily} onChange={(e) => setDaily(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder={path === "res" || comM === "bill" ? "الفاتورة الشهرية (ريال)" : comM === "kwh" ? "الاستهلاك الشهري (كيلووات)" : "الديزل الشهري (لتر)"} className="w-40 rounded-lg border bg-card px-2 py-1.5 text-xs" />
                 <button type="submit" className="rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground">عرض</button>
               </form>
@@ -557,6 +557,22 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           </div>
           <button onClick={() => setShowHist((v) => !v)} className="flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض الجاهزة ({PRESETS.length})</button>
         </div>
+        {invs && !tiers && (
+          <div className="rounded-xl border bg-muted/30 p-2">
+            {!invKw ? (<>
+              <div className="mb-1 text-xs font-bold">اختر قدرة الإنفرتر:</div>
+              <div className="flex flex-wrap gap-1">
+                {invs.map((c) => <button key={c.kw} type="button" onClick={() => { const only = c.single && c.three ? null : (c.single ?? c.three)!; if (only) { setInvs(null); setTiers(tiersFrom([only])); } else setInvKw(c); }} className="rounded-lg border bg-card px-3 py-1.5 text-xs font-bold hover:bg-muted">{c.kw} كيلو</button>)}
+              </div>
+            </>) : (<>
+              <div className="mb-1 text-xs font-bold">إنفرتر {invKw.kw} كيلو — سنجل أو ثري فاز؟</div>
+              <div className="flex flex-wrap gap-1">
+                {([["single", "سنجل فاز"], ["three", "ثري فاز"]] as const).map(([k, label]) => { const p = invKw[k]; return p ? <button key={k} type="button" onClick={() => { setInvs(null); setInvKw(null); setTiers(tiersFrom([p])); }} className="rounded-lg border bg-card px-3 py-1.5 text-xs font-bold hover:bg-muted">{label}</button> : null; })}
+                {invs.length > 1 && <button type="button" onClick={() => setInvKw(null)} className="rounded-lg bg-muted px-3 py-1.5 text-xs">رجوع</button>}
+              </div>
+            </>)}
+          </div>
+        )}
         {tiers && (
           <div className="rounded-xl border bg-muted/30 p-2">
             <div className="mb-1 text-xs font-bold">اختر مستوى الاستقلالية:</div>
