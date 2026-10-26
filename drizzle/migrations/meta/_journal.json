@@ -36,6 +36,13 @@
       "when": 1792423585420,
       "tag": "0004_add_missing_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793027419268,
+      "tag": "0005_report_requests",
+      "breakpoints": true
     }
   ]
 }
