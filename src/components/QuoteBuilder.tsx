@@ -153,7 +153,9 @@ export type ComMethod = "bill" | "kwh" | "diesel";
 // Commercial (com_1 bill / com_2 kWh per month / com_3 diesel litres ÷ 0.27) → kWh/month ÷ 30.
 export const optionsForCom = (m: ComMethod, v: number, price = DEFAULT_KWH_PRICE): Preset[] => {
   const kwh = m === "bill" ? v / price : m === "kwh" ? v : v / 0.27;
-  return comOptions(kwh / 30);
+  const need = kwh / 30;
+  // Live bot: a commercial need that fits the home range is treated exactly as residential.
+  return need <= RES_MAX_DAILY + E ? resOptions(need) : comOptions(need);
 };
 
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
