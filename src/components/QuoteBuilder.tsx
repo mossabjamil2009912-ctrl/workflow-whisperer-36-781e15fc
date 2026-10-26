@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Search, FilePlus2, Save, Minus, Plus, Trash2, Check, Zap, Battery, Sun, Box, ShieldCheck, Server, Home, Cpu, Cable, Wrench, Printer, History, Share2, X, Download } from "lucide-react";
@@ -353,6 +353,21 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
     return n;
   });
   const setQty = (k: string, qty: number) => setLines((p) => (p[k] ? { ...p, [k]: { ...p[k], qty: Math.max(1, qty || 1) } } : p));
+  const [swapKey, setSwapKey] = useState<string | null>(null);
+  const [editNote, setEditNote] = useState(false);
+  const chosenRef = useRef<HTMLHeadingElement>(null);
+  const setPriceLocal = (k: string, price: number) => setLines((p) => (p[k] ? { ...p, [k]: { ...p[k], price: Math.max(0, price || 0) } } : p));
+  const catOfKey = (k: string) => items.find((r) => r.key === k)?.category;
+  const swapLine = (oldKey: string, r: Row) => setLines((p) => {
+    const old = p[oldKey]; if (!old) return p;
+    const n: Record<string, Line> = {};
+    for (const [k, v] of Object.entries(p)) {
+      if (k === oldKey) n[r.key] = { key: r.key, name: r.name, unit: r.unit, price: Number(r.price ?? 0), qty: old.qty + (p[r.key] && r.key !== oldKey ? p[r.key].qty : 0), specs: specsOf(r) };
+      else if (k !== r.key) n[k] = v;
+    }
+    return n;
+  });
+  const closePreview = () => { setPreview(null); setEditNote(true); setTimeout(() => chosenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
   const remove = (k: string) => setLines((p) => { const n = { ...p }; delete n[k]; return n; });
   const addCustom = () => {
     const price = Number(custom.price);
@@ -593,12 +608,27 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           <input value={cust.city} onChange={(e) => setCust({ ...cust, city: e.target.value })} placeholder="المدينة" className="min-w-0 rounded-md border bg-background px-1.5 py-1 text-xs" />
           <input dir="ltr" value={cust.phone} onChange={(e) => setCust({ ...cust, phone: e.target.value })} placeholder="الهاتف" className="min-w-0 rounded-md border bg-background px-1.5 py-1 text-xs" />
         </div>
-        <h3 className="flex items-center justify-between text-sm font-bold">الأصناف المختارة <span className="rounded-full bg-primary px-2 text-xs text-primary-foreground">{chosen.length}</span></h3>
+        {editNote && chosen.length > 0 && <p className="rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">تقدر تعدّل هذا العرض قبل الحفظ أو الإرسال — التعديل على هذه النسخة فقط، والمنظومة الجاهزة وقائمة الأصناف لا تتغير. لإضافة صنف اختره من الجداول.</p>}
+        <h3 ref={chosenRef} className="flex items-center justify-between text-sm font-bold">الأصناف المختارة <span className="rounded-full bg-primary px-2 text-xs text-primary-foreground">{chosen.length}</span></h3>
         <ul className="min-h-40 flex-1 space-y-1 overflow-y-auto">
           {chosen.length === 0 && <li className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">اضغط على أي صنف من الجداول لإضافته</li>}
           {chosen.map((l) => (
             <li key={l.key} className="flex items-center gap-2 rounded-md bg-muted/50 px-2 py-1 text-xs animate-in fade-in slide-in-from-left-2">
-              <div className="min-w-0 flex-1"><div className="font-semibold">{l.name}</div>{l.specs.length > 0 && <ul className="my-0.5 space-y-0.5 border-r-2 border-primary/40 pr-1.5 text-[10px] leading-snug text-muted-foreground">{l.specs.map((s, i) => { const k = s.indexOf(":"); return <li key={i}>{k > 0 && k < 60 ? <><b className="text-foreground">{s.slice(0, k + 1)}</b>{s.slice(k + 1)}</> : s}</li>; })}</ul>}<div className="text-[10px] text-muted-foreground">{l.qty} × {usd(l.price)} {l.unit ? `/ ${l.unit}` : ""}</div></div>
+              <div className="min-w-0 flex-1"><div className="font-semibold">{l.name}</div>{l.specs.length > 0 && <ul className="my-0.5 space-y-0.5 border-r-2 border-primary/40 pr-1.5 text-[10px] leading-snug text-muted-foreground">{l.specs.map((s, i) => { const k = s.indexOf(":"); return <li key={i}>{k > 0 && k < 60 ? <><b className="text-foreground">{s.slice(0, k + 1)}</b>{s.slice(k + 1)}</> : s}</li>; })}</ul>}<div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
+                <button type="button" aria-label="إنقاص" onClick={() => setQty(l.key, l.qty - 1)} className="rounded bg-card p-0.5"><Minus className="h-3 w-3" /></button>
+                <input type="number" min={1} value={l.qty} onChange={(e) => setQty(l.key, Number(e.target.value))} className="w-11 rounded border bg-background px-1 text-center font-bold" />
+                <button type="button" aria-label="زيادة" onClick={() => setQty(l.key, l.qty + 1)} className="rounded bg-card p-0.5"><Plus className="h-3 w-3" /></button>
+                <span>×</span>
+                <input type="number" min={0} step="0.01" value={l.price} onChange={(e) => setPriceLocal(l.key, Number(e.target.value))} className="w-16 rounded border bg-background px-1 text-center" aria-label="السعر لهذا العرض" />
+                <span>$ {l.unit ? `/ ${l.unit}` : ""}</span>
+                {catOfKey(l.key) && <button type="button" onClick={() => setSwapKey(swapKey === l.key ? null : l.key)} className="rounded border border-primary/40 px-1.5 font-semibold text-primary">تغيير</button>}
+              </div>
+              {swapKey === l.key && (
+                <div className="mt-1 max-h-40 space-y-0.5 overflow-y-auto rounded border bg-card p-1">
+                  {(byCat[catOfKey(l.key) ?? ""] ?? []).filter((r) => r.key !== l.key).map((r) => (
+                    <button key={r.key} type="button" onClick={() => { swapLine(l.key, r); setSwapKey(null); }} className="block w-full rounded px-1 py-0.5 text-right hover:bg-muted">{r.name} <b className="text-primary">{usd(Number(r.price ?? 0))}</b></button>))}
+                </div>)}
+              </div>
               <b className="text-primary">{usd(l.qty * l.price)}</b>
               <button onClick={() => remove(l.key)} className="rounded p-0.5 text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /></button>
             </li>))}
@@ -634,12 +664,12 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           </div>
         )}
         {preview && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-2 animate-in fade-in" onClick={() => setPreview(null)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-2 animate-in fade-in" onClick={closePreview}>
             <div className="flex h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-card shadow-2xl animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-2 border-b p-2">
                 <b className="flex-1 truncate text-sm">{preview.name}</b>
                 <button onClick={download} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"><Download className="h-4 w-4" />حفظ PDF</button>
-                <button onClick={() => setPreview(null)} className="rounded-md p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+                <button onClick={closePreview} className="rounded-md p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
               </div>
               <iframe title="معاينة عرض السعر" srcDoc={preview.html} className="min-h-0 w-full flex-1 bg-background" />
               <div className="grid grid-cols-3 gap-2 border-t p-2">
