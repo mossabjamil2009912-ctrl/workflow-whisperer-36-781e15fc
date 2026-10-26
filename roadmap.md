@@ -7,6 +7,8 @@
 - [ ] Switch the live bot to send PVsyst/SLD as requests (prepared; waits for publishing the app first)
 - [x] Editable kWh price (default 290) + app home/business picks copied exactly from the bot
 - [x] Bot reads kWh price from the app
-- [x] Connect n8n in the new workspace
+- [x] Connect n8n in the new workspace (again after move)
 - [x] Edit quote items (qty, swap, price, delete) after closing the price card — this copy only
 - [ ] Publish so the bot gets the kWh price from the live app
+- [x] Three choices (less / recommended / more independence) in app and bot home path
+- [ ] Bot: three choices for large business systems (bot still asks inverter size there)

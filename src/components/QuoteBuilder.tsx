@@ -158,6 +158,23 @@ export const optionsForCom = (m: ComMethod, v: number, price = DEFAULT_KWH_PRICE
   return need <= RES_MAX_DAILY + E ? resOptions(need) : comOptions(need);
 };
 
+// Three choices (app + bot): one size smaller / the right system / one size larger.
+// Size order: home systems as listed, then business systems by daily production.
+const SIZE_ORDER: Preset[] = [...RES_LIST, ...[...COM_LIST].sort((a, b) => dailyProduction(a) - dailyProduction(b))];
+export type Tiers = { low?: Preset | undefined; rec: Preset; high?: Preset | undefined };
+export const tiersFrom = (opts: Preset[]): Tiers | null => {
+  if (!opts.length) return null;
+  const idx = opts.map((p) => SIZE_ORDER.indexOf(p)).filter((i) => i >= 0);
+  const lo = Math.min(...idx), hi = Math.max(...idx);
+  const prodSet = new Set(opts.map(dailyProduction));
+  let low: Preset | undefined, high: Preset | undefined;
+  for (let i = lo - 1; i >= 0; i--) if (!prodSet.has(dailyProduction(SIZE_ORDER[i]!))) { low = SIZE_ORDER[i]; break; }
+  for (let i = hi + 1; i < SIZE_ORDER.length; i++) if (!prodSet.has(dailyProduction(SIZE_ORDER[i]!))) { high = SIZE_ORDER[i]; break; }
+  return { low, rec: opts[0]!, high };
+};
+export const tieredOptions = (path: "res" | "com", m: ComMethod, v: number, price = DEFAULT_KWH_PRICE) =>
+  tiersFrom(path === "res" ? optionsForResBill(v, price) : optionsForCom(m, v, price));
+
 function quoteBody(no: string, cust: { name: string; phone: string; city: string }, lines: Line[], notes: string) {
   const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
   const o = location.origin;
@@ -320,7 +337,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
   const [daily, setDaily] = useState("");
   const [path, setPath] = useState<"res" | "com" | null>(null);
   const [comM, setComM] = useState<ComMethod | null>(null);
-  const [opts, setOpts] = useState<Preset[]>([]);
+  const [tiers, setTiers] = useState<Tiers | null>(null);
   const getKwh = useServerFn(getKwhPrice);
   const saveKwh = useServerFn(setKwhPrice);
   const { data: kwhData, refetch: refetchKwh } = useQuery({ queryKey: ["kwh_price"], queryFn: () => getKwh({ data: { pw } }) });
@@ -502,13 +519,13 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           <h2 className="flex items-center gap-2 text-lg font-bold"><FilePlus2 className="h-5 w-5 text-primary" />إنشاء عرض سعر</h2>
           <div className="mr-auto flex flex-wrap items-center gap-1">
             {(["res", "com"] as const).map((k) => (
-              <button key={k} type="button" onClick={() => { setPath(path === k ? null : k); setComM(null); setOpts([]); setDaily(""); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${path === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{k === "res" ? "سكني" : "تجاري"}</button>
+              <button key={k} type="button" onClick={() => { setPath(path === k ? null : k); setComM(null); setTiers(null); setDaily(""); }} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${path === k ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"}`}>{k === "res" ? "سكني" : "تجاري"}</button>
             ))}
             {path === "com" && (["bill", "kwh", "diesel"] as const).map((m) => (
               <button key={m} type="button" onClick={() => { setComM(m); setDaily(""); }} className={`rounded-lg border px-2 py-1.5 text-xs font-semibold ${comM === m ? "border-primary bg-primary/10 text-primary" : "bg-card"}`}>{m === "bill" ? "فاتورة" : m === "kwh" ? "استهلاك شهري" : "الديزل"}</button>
             ))}
             {(path === "res" || (path === "com" && comM)) && (
-              <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (!(n > 0)) return; const o = path === "res" ? optionsForResBill(n, kwhPrice) : optionsForCom(comM!, n, kwhPrice); if (!o.length) { setOpts([]); return setMsg("لا توجد منظومة مناسبة — يُحوّل للموظف المختص"); } if (o.length === 1) { setOpts([]); loadPreset(o[0]!); } else setOpts(o); }} className="flex items-center gap-1">
+              <form onSubmit={(e) => { e.preventDefault(); const n = Number(daily); if (!(n > 0)) return; const t = tieredOptions(path!, comM ?? "bill", n, kwhPrice); if (!t) { setTiers(null); return setMsg("لا توجد منظومة مناسبة — يُحوّل للموظف المختص"); } setTiers(t); }} className="flex items-center gap-1">
                 <input autoFocus value={daily} onChange={(e) => setDaily(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder={path === "res" || comM === "bill" ? "الفاتورة الشهرية (ريال)" : comM === "kwh" ? "الاستهلاك الشهري (كيلووات)" : "الديزل الشهري (لتر)"} className="w-40 rounded-lg border bg-card px-2 py-1.5 text-xs" />
                 <button type="submit" className="rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground">عرض</button>
               </form>
@@ -524,11 +541,13 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
           </div>
           <button onClick={() => setShowHist((v) => !v)} className="flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold hover:bg-muted/70"><History className="h-4 w-4" />العروض الجاهزة ({PRESETS.length})</button>
         </div>
-        {opts.length > 1 && (
+        {tiers && (
           <div className="rounded-xl border bg-muted/30 p-2">
-            <div className="mb-1 text-xs font-bold">منظومات مناسبة لاستهلاكك — اختر واحدة (مثل البوت):</div>
-            <div className="grid gap-1 sm:grid-cols-2">
-              {opts.map((p) => <button key={p.title} type="button" onClick={() => { setOpts([]); loadPreset(p); }} className="rounded-lg border bg-card px-2 py-1.5 text-right text-xs font-semibold hover:bg-muted">{p.title}</button>)}
+            <div className="mb-1 text-xs font-bold">اختر مستوى الاستقلالية:</div>
+            <div className="grid gap-1 sm:grid-cols-3">
+              {([["low", "أقل استقلالية"], ["rec", "موصى به"], ["high", "أكثر استقلالية"]] as const).map(([k, label]) => { const p = tiers[k]; return p ? (
+                <button key={k} type="button" onClick={() => { setTiers(null); loadPreset(p); }} className={`rounded-lg border px-2 py-1.5 text-right text-xs hover:bg-muted ${k === "rec" ? "border-primary bg-primary/10" : "bg-card"}`}><div className="font-bold">{label}</div><div className="text-muted-foreground">{p.title}</div></button>
+              ) : null; })}
             </div>
           </div>
         )}
