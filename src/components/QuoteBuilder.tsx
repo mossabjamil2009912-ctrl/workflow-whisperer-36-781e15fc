@@ -362,7 +362,7 @@ export function QuoteBuilder({ pw, initialCustomerId }: { pw: string; initialCus
     const old = p[oldKey]; if (!old) return p;
     const n: Record<string, Line> = {};
     for (const [k, v] of Object.entries(p)) {
-      if (k === oldKey) n[r.key] = { key: r.key, name: r.name, unit: r.unit, price: Number(r.price ?? 0), qty: old.qty + (p[r.key] && r.key !== oldKey ? p[r.key].qty : 0), specs: specsOf(r) };
+      if (k === oldKey) n[r.key] = { key: r.key, name: r.name, unit: r.unit, price: Number(r.price ?? 0), qty: old.qty + (r.key !== oldKey ? (p[r.key]?.qty ?? 0) : 0), specs: specsOf(r) };
       else if (k !== r.key) n[k] = v;
     }
     return n;
