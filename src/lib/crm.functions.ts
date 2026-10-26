@@ -366,3 +366,80 @@ export const listQuotes = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return rows;
   });
+
+// ---------- PVsyst / SLD report requests ----------
+import { sendBlocker, REPORT_LABEL, type ReportKind } from "@/lib/report-rules";
+const Kind = z.enum(["pvsyst", "sld"]);
+
+export const listReportRequests = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ pw: z.string() }).parse(d))
+  .handler(async ({ data }) => {
+    check(data.pw);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [r, f] = await Promise.all([
+      supabaseAdmin.from("report_requests").select("*").order("created_at", { ascending: false }).limit(500),
+      supabaseAdmin.from("preset_reports").select("preset_title,kind,file_name"),
+    ]);
+    if (r.error) throw new Error(r.error.message);
+    if (f.error) throw new Error(f.error.message);
+    return { requests: r.data, files: f.data };
+  });
+
+export const uploadPresetReport = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ pw: z.string(), preset_title: z.string().min(1).max(300), kind: Kind, file_name: z.string().min(1).max(200), b64: z.string().max(23_000_000) }).parse(d))
+  .handler(async ({ data }) => {
+    check(data.pw);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bin = Uint8Array.from(atob(data.b64), (ch) => ch.charCodeAt(0));
+    const path = `reports/${data.kind}/${crypto.randomUUID()}.pdf`;
+    const up = await supabaseAdmin.storage.from("crm-attachments").upload(path, bin, { contentType: "application/pdf" });
+    if (up.error) throw new Error("تعذّر رفع الملف");
+    const { error } = await supabaseAdmin.from("preset_reports").upsert({ preset_title: data.preset_title, kind: data.kind, path, file_name: data.file_name, updated_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const openPresetReport = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ pw: z.string(), preset_title: z.string().min(1).max(300), kind: Kind }).parse(d))
+  .handler(async ({ data }) => {
+    check(data.pw);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: f } = await supabaseAdmin.from("preset_reports").select("path").eq("preset_title", data.preset_title).eq("kind", data.kind).maybeSingle();
+    if (!f) throw new Error("لا يوجد ملف مرفوع لهذه المنظومة");
+    const sig = await supabaseAdmin.storage.from("crm-attachments").createSignedUrl(f.path, 60 * 30);
+    if (sig.error || !sig.data) throw new Error("تعذّر فتح الملف");
+    return { url: sig.data.signedUrl };
+  });
+
+export const sendReportRequest = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ pw: z.string(), id: z.string().uuid(), preset_title: z.string().min(1).max(300) }).parse(d))
+  .handler(async ({ data }) => {
+    check(data.pw);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rq } = await supabaseAdmin.from("report_requests").select("*").eq("id", data.id).single();
+    if (!rq) throw new Error("الطلب غير موجود");
+    const kind = rq.kind as ReportKind;
+    const { data: f } = await supabaseAdmin.from("preset_reports").select("path,file_name").eq("preset_title", data.preset_title).eq("kind", kind).maybeSingle();
+    const block = sendBlocker(rq, f);
+    if (block || !f) throw new Error(block ?? "");
+    const sig = await supabaseAdmin.storage.from("crm-attachments").createSignedUrl(f.path, 60 * 60 * 24 * 365);
+    if (sig.error || !sig.data) throw new Error("تعذّر إنشاء رابط الملف");
+    const url = sig.data.signedUrl;
+    const text = `أكتس لاستيراد أنظمة الطاقة\n${REPORT_LABEL[kind]} لمنظومتك`;
+    const res = await fetch("https://n8n.srv1994780.hstgr.cloud/webhook/actes-send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-bot-secret": process.env["BOT_INGEST_SECRET"] ?? "" },
+      body: JSON.stringify({ phone: rq.phone, text, media_url: url, media_type: "pdf", file_name: f.file_name }),
+    });
+    if (!res.ok) {
+      console.error(`n8n report send failed [${res.status}]: ${await res.text()}`);
+      throw new Error(`تعذّر الإرسال (${res.status})`);
+    }
+    const now = new Date().toISOString();
+    await supabaseAdmin.from("report_requests").update({ status: "sent", sent_at: now, system_label: data.preset_title }).eq("id", data.id);
+    if (rq.customer_id) {
+      await supabaseAdmin.from("messages").insert({ customer_id: rq.customer_id, direction: "agent", kind: "pdf", text, media_url: url, mime: "application/pdf", file_name: f.file_name });
+      await supabaseAdmin.from("customers").update({ last_message: text, last_at: now }).eq("id", rq.customer_id);
+    }
+    return { ok: true };
+  });
