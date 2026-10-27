@@ -15,3 +15,6 @@
 - [x] Business three choices = the very next size (app)
 - [x] App: pick inverter size + single/three phase for business, like the bot
 - [x] Bot: inverter size → phase → three choices (very next size) for business
+- [x] App: always ask inverter size first for business, even if only one size
+- [ ] Bot: always ask inverter size first (waits on n8n being connected in this workspace)
+- [ ] Connect n8n in the new workspace (card skipped)
